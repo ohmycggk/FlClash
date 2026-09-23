@@ -273,6 +273,19 @@ jobs:
         with:
           submodules: recursive
 
+      # Distributor artifact names and the platform version strings all come
+      # from pubspec.yaml, while the release is cut from the tag: keep the
+      # build number, but let the tag own the version name.
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          build="$(sed -n 's/^version: *[^+]*+//p' pubspec.yaml)"
+          sed -i.bak "s/^version:.*/version: ${version}${build:++$build}/" pubspec.yaml
+          rm pubspec.yaml.bak
+          grep '^version:' pubspec.yaml
+
       - name: Setup Android Signing
         if: startsWith(matrix.platform,'android')
         run: |
