@@ -44,6 +44,10 @@
 - **core,android** Push notifications reconnect in Doze (1e9955d)
 - **backup,database** Restores never apply halfway (bee8f24)
 
+## v0.8.9601 (2026-09-23)
+
+Internal improvements only.
+
 ## v0.8.98 (2026-09-14)
 
 **Bug Fixes**
