@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "versions": [
     {
-      "version": "0.8.9603",
-      "tag": "v0.8.9603",
+      "version": "0.8.9801",
+      "tag": "v0.8.9801",
       "date": "2026-09-23",
       "prerelease": false,
       "groups": [
@@ -17,20 +17,6 @@
           ]
         }
       ]
-    },
-    {
-      "version": "0.8.9602",
-      "tag": "v0.8.9602",
-      "date": "2026-09-23",
-      "prerelease": false,
-      "groups": []
-    },
-    {
-      "version": "0.8.9601",
-      "tag": "v0.8.9601",
-      "date": "2026-09-23",
-      "prerelease": false,
-      "groups": []
     },
     {
       "version": "0.8.98",

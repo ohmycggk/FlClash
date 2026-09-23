@@ -1,18 +1,10 @@
 # Changelog
 
-## v0.8.9603 (2026-09-23)
+## v0.8.9801 (2026-09-23)
 
 **Bug Fixes**
 
 - Update repository references in release template and changelog tool (1620512)
-
-## v0.8.9602 (2026-09-23)
-
-Internal improvements only.
-
-## v0.8.9601 (2026-09-23)
-
-Internal improvements only.
 
 ## v0.8.98 (2026-09-14)
 
