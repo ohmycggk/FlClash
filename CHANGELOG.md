@@ -48,6 +48,10 @@
 
 Internal improvements only.
 
+## v0.8.9602 (2026-09-23)
+
+Internal improvements only.
+
 ## v0.8.98 (2026-09-14)
 
 **Bug Fixes**
