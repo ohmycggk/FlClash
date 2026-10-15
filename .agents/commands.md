@@ -2,7 +2,9 @@
 
 ## Building
 
-Update submodules first. The ClashMeta Go core lives in `core/Clash.Meta/`.
+Update submodules first. The Go core lives in `core/Clash.Meta/`, the
+`nw` branch of `ohmycggk/clash-meta-nw` carrying the nowhere protocol plus the
+FlClash integration patches.
 
 ```bash
 git submodule update --init --recursive
