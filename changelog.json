@@ -2,6 +2,33 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.9.01",
+      "tag": "v0.9.01",
+      "date": "2026-10-15",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "66c9104",
+              "scope": "profiles",
+              "text": "nowhere proxy type in the custom proxy form"
+            }
+          ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "28a6599",
+              "text": "Update repository references in release template and changelog tool"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.9.0",
       "tag": "v0.9.0",
       "date": "2026-10-14",

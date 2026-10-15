@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.01 (2026-10-15)
+
+**Features**
+
+- **profiles** nowhere proxy type in the custom proxy form (66c9104)
+
+**Bug Fixes**
+
+- Update repository references in release template and changelog tool (28a6599)
+
 ## v0.9.0 (2026-10-14)
 
 **Breaking Changes**
