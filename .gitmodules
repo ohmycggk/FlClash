@@ -1,4 +1,4 @@
 [submodule "core/Clash.Meta"]
 	path = core/Clash.Meta
-	url = https://github.com/ohmycggk/mihomo.git
-	branch = flclash/nowhere2
+	url = https://github.com/ohmycggk/clash-meta-nw.git
+	branch = nw
