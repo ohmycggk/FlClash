@@ -253,6 +253,7 @@ const customProxyTypes = [
   'tailscale',
   'zerotier',
   'easytier',
+  'nowhere',
 ];
 
 /// The standard methods of sing-shadowsocks2, which mihomo's ss adapter
@@ -402,7 +403,8 @@ extension CustomProxyExt on CustomProxy {
     'tuic' ||
     'shadowquic' ||
     'gost-relay' ||
-    'trusttunnel' => const {'server', 'port'},
+    'trusttunnel' ||
+    'nowhere' => const {'server', 'port'},
     _ => const {},
   };
 
@@ -418,7 +420,10 @@ extension CustomProxyExt on CustomProxy {
     'vmess' => const [ProxyField.cipher, ProxyField.alterId, ProxyField.uuid],
     'vless' => const [ProxyField.uuid],
     'tuic' => const [ProxyField.uuid, ProxyField.password],
-    'trojan' || 'anytls' || 'hysteria2' => const [ProxyField.password],
+    'trojan' ||
+    'anytls' ||
+    'hysteria2' ||
+    'nowhere' => const [ProxyField.password],
     'hysteria' => const [ProxyField.up, ProxyField.down, ProxyField.authStr],
     'snell' => const [ProxyField.psk],
     'sudoku' => const [ProxyField.key],
