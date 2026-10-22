@@ -300,6 +300,15 @@ Telegram post. They publish no GitHub release, so the update dialog never sees t
 version from `pubspec.yaml` rather than the tag, so the patch has to be bumped before the first `-pre.N` of a cycle:
 while `v<pubspec version>` is still tagged it refuses to collect anything and the release job fails.
 
+This fork releases on top of an upstream base: pubspec.yaml carries the upstream version line, and the release tag owns
+the version name. The build job's "Set version from tag" step rewrites pubspec from the pushed tag, keeping the
+`+build` number, so a tag `v0.9.11` builds as `0.9.11+<build>` and the app update channel serves it from this
+repository. Both version tools resolve from pubspec, which names the upstream base, so a fork release always passes the
+number explicitly — `tool/release.sh stable --version 0.9.11 --push` or
+`dart run tool/changelog.dart release --version 0.9.11` — instead of letting the default resolution pick an upstream
+number. The core submodule pin has to exist on `clash-meta-nw` before the tag pushes; see Core API Safety in
+`.agents/rules.md`.
+
 ### Website
 
 `site/` is the GitHub Pages site: a static page that renders `CHANGELOG.md` and the download links in the browser, and
