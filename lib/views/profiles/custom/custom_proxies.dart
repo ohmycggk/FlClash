@@ -149,6 +149,55 @@ enum _OptionSection {
   };
 }
 
+/// Display names for [customProxyTypes]; the raw id stays what gets saved.
+const _proxyTypeLabels = {
+  'ss': 'Shadowsocks',
+  'ssr': 'ShadowsocksR',
+  'socks5': 'SOCKS5',
+  'http': 'HTTP',
+  'vmess': 'VMess',
+  'vless': 'VLESS',
+  'snell': 'Snell',
+  'trojan': 'Trojan',
+  'hysteria': 'Hysteria',
+  'hysteria2': 'Hysteria2',
+  'wireguard': 'WireGuard',
+  'tuic': 'TUIC',
+  'shadowquic': 'ShadowQuic',
+  'gost-relay': 'Gost Relay',
+  'direct': 'Direct',
+  'dns': 'DNS',
+  'reject': 'Reject',
+  'rematch': 'Rematch',
+  'ssh': 'SSH',
+  'mieru': 'Mieru',
+  'anytls': 'AnyTLS',
+  'sudoku': 'Sudoku',
+  'masque': 'MASQUE',
+  'trusttunnel': 'TrustTunnel',
+  'openvpn': 'OpenVPN',
+  'tailscale': 'Tailscale',
+  'zerotier': 'ZeroTier',
+  'easytier': 'EasyTier',
+  'nowhere': 'Nowhere',
+};
+
+/// The picker leads with these, in this order; the rest keep the
+/// [customProxyTypes] order.
+const _preferredProxyTypes = [
+  'nowhere',
+  'sudoku',
+  'anytls',
+  'trojan',
+  'vless',
+  'hysteria2',
+];
+
+List<String> get _pickerProxyTypes => [
+  ..._preferredProxyTypes,
+  ...customProxyTypes.where((type) => !_preferredProxyTypes.contains(type)),
+];
+
 class CustomProxiesView extends ConsumerStatefulWidget {
   const CustomProxiesView({super.key});
 
@@ -1105,8 +1154,10 @@ class _EditCustomProxyViewState extends ConsumerState<_EditCustomProxyView> {
   Future<void> _handleSelectType() async {
     final res = await _selectChoice(
       title: context.appLocalizations.proxyType,
-      items: customProxyTypes,
+      items: _pickerProxyTypes,
       selectedOf: (state) => state.type,
+      label: (item) => _proxyTypeLabels[item] ?? item,
+      grid: true,
     );
     if (res == null) {
       return;
@@ -1130,13 +1181,16 @@ class _EditCustomProxyViewState extends ConsumerState<_EditCustomProxyView> {
     required String title,
     required List<String> items,
     required String? Function(CustomProxy state) selectedOf,
+    String Function(String item)? label,
+    bool grid = false,
   }) {
     return Navigator.of(context).push(
       PagedSheetRoute(
         builder: (context) => SelectionSheet<String>(
           title: title,
           sections: [SelectionSection(items: items)],
-          labelBuilder: (item) => item,
+          labelBuilder: label ?? (item) => item,
+          grid: grid,
           selectedOf: (ref) =>
               ref.watch(customProxyProvider.select(selectedOf)),
           onSelected: (item) => Navigator.of(context).pop(item),

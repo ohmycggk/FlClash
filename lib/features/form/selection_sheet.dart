@@ -31,6 +31,9 @@ class SelectionSheet<T> extends ConsumerStatefulWidget {
   /// once the last item is picked.
   final bool removeOnSelect;
 
+  /// Items lay out as two-across tiles instead of full-bleed rows.
+  final bool grid;
+
   const SelectionSheet({
     super.key,
     required this.title,
@@ -42,6 +45,7 @@ class SelectionSheet<T> extends ConsumerStatefulWidget {
     this.emptyLabel,
     this.loadingStatus,
     this.removeOnSelect = false,
+    this.grid = false,
   });
 
   @override
@@ -265,6 +269,76 @@ class _SelectionSheetState<T> extends ConsumerState<SelectionSheet<T>>
     );
   }
 
+  Widget _buildGridTile(
+    BuildContext context,
+    SelectionSection<T> section,
+    T item,
+    int index, {
+    required bool isSelected,
+    required bool isRevealTarget,
+  }) {
+    return ItemPositionProvider(
+      key: isRevealTarget ? _selectedKey : null,
+      position: ItemPosition.get(index, section.items.length),
+      child: CommonCard(
+        isSelected: isSelected,
+        onPressed: () => _handleSelected(item),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: TooltipText(
+                text: Text(
+                  widget.labelBuilder(item),
+                  style: context.listTitleStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            if (isSelected) const SelectionCheck(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrid(
+    BuildContext context,
+    SelectionSection<T> section, {
+    required T? selected,
+    required int? selectedIndex,
+  }) {
+    const spacing = 8.0;
+    const tileExtent = 160.0;
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        // Tiles of about [tileExtent] across: two on a phone, more on wide
+        // sheets, never fewer than one.
+        final columns =
+            ((constraints.crossAxisExtent + spacing) ~/ (tileExtent + spacing))
+                .clamp(1, 12);
+        return SliverGrid.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            mainAxisExtent: 52,
+          ),
+          itemCount: section.items.length,
+          itemBuilder: (context, index) => _buildGridTile(
+            context,
+            section,
+            section.items[index],
+            index,
+            isSelected: section.items[index] == selected,
+            isRevealTarget: index == selectedIndex,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sections = _matchingSections(context);
@@ -313,25 +387,34 @@ class _SelectionSheetState<T> extends ConsumerState<SelectionSheet<T>>
                   ),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SuperSliverList.builder(
-                    listController: sectionIndex == location?.section
-                        ? _revealController
-                        : null,
-                    itemCount: section.items.length,
-                    itemBuilder: (context, index) {
-                      final item = section.items[index];
-                      return _buildItem(
-                        context,
-                        section,
-                        item,
-                        index,
-                        isSelected: item == selected,
-                        isRevealTarget:
-                            sectionIndex == location?.section &&
-                            index == location?.index,
-                      );
-                    },
-                  ),
+                  sliver: widget.grid
+                      ? _buildGrid(
+                          context,
+                          section,
+                          selected: selected,
+                          selectedIndex: sectionIndex == location?.section
+                              ? location?.index
+                              : null,
+                        )
+                      : SuperSliverList.builder(
+                          listController: sectionIndex == location?.section
+                              ? _revealController
+                              : null,
+                          itemCount: section.items.length,
+                          itemBuilder: (context, index) {
+                            final item = section.items[index];
+                            return _buildItem(
+                              context,
+                              section,
+                              item,
+                              index,
+                              isSelected: item == selected,
+                              isRevealTarget:
+                                  sectionIndex == location?.section &&
+                                  index == location?.index,
+                            );
+                          },
+                        ),
                 ),
               ],
               SliverToBoxAdapter(

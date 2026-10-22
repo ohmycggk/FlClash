@@ -1598,6 +1598,93 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets(
+    'the type picker leads with the tiered protocols in two columns',
+    (tester) async {
+      _setViewport(tester);
+      final core = _MockCore();
+      registerFallbackValue(<Map<String, dynamic>>[]);
+      when(() => core.validateProxies(any())).thenAnswer((_) async => ['']);
+      final container = ProviderContainer(
+        overrides: [
+          coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          customGroupNamesProvider.overrideWith(
+            (_) => Stream.value(const <String>{}),
+          ),
+          customProxiesProvider.overrideWith(
+            () => _RecordingCustomProxies(nodes),
+          ),
+          clashProvidersActionProvider.overrideWith(
+            _RecordingClashProvidersAction.new,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      globalState.container = container;
+      container
+          .read(viewSizeProvider.notifier)
+          .update((_) => const Size(500, 1000));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TestApp(child: CustomProxiesView()),
+        ),
+      );
+      await tester.pump();
+      final l10n = AppLocalizations.current;
+
+      await tester.tap(find.text('HK'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FormRow, l10n.proxyType));
+      await tester.pumpAndSettle();
+
+      Finder offered(String label) => find.descendant(
+        of: find.byType(SelectionSheet<String>),
+        matching: find.text(label),
+      );
+      final items = tester
+          .widget<SelectionSheet<String>>(find.byType(SelectionSheet<String>))
+          .sections
+          .single
+          .items;
+      expect(items.take(6), [
+        'nowhere',
+        'sudoku',
+        'anytls',
+        'trojan',
+        'vless',
+        'hysteria2',
+      ]);
+      expect(items[6], 'ss');
+      expect(offered('Shadowsocks'), findsOneWidget);
+      expect(offered('ss'), findsNothing);
+      expect(
+        tester.getTopLeft(offered('Sudoku')).dy,
+        tester.getTopLeft(offered('Nowhere')).dy,
+      );
+      expect(
+        tester.getTopLeft(offered('Sudoku')).dx,
+        greaterThan(tester.getTopLeft(offered('Nowhere')).dx),
+      );
+
+      await tester.tap(offered('Nowhere'));
+      await tester.pumpAndSettle();
+      // Past the edit view's validation debounce, so no timer is left pending.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.widgetWithText(FormRow, l10n.proxyType),
+          matching: find.text('nowhere'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('an app-level proxy saves outside a profile and reapplies on '
       'leaving', (tester) async {
     _setViewport(tester);
