@@ -656,7 +656,7 @@ void main() {
       expect(readForm(tester).definition['udp-over-tcp'], isTrue);
 
       await tapRow(l10n.proxyType);
-      await tester.tap(find.text('vless'));
+      await tester.tap(find.text('VLESS'));
       await tester.pumpAndSettle();
       expect(row(l10n.cipher), findsNothing);
       expect(row('UDP over TCP'), findsNothing);
