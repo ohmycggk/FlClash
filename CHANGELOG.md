@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.9.101 (2026-10-22)
+
+**Breaking Changes**
+
+- **network** Desktop TUN keys follow the profile unless picked; changed values carry over (b42da00)
+
+**Features**
+
+- **profiles** Pick the proxy type from a two-column grid (04bb2d0)
+- **l10n** French, Spanish and Korean translations (9f32447)
+- **android** No more Firebase analytics or crash reporting (a9fa096)
+- **network** Per-key desktop TUN settings; system proxy and tray fixes (b42da00)
+- **theme** Redesigned theme colors and color styles (c27546e)
+- **dashboard** A redesigned dashboard around the current exit (1d2900c)
+- **profiles** Profile-detail resources and include-all in custom groups (42c976a)
+- **proxies** Proxy groups as cards, group tabs as chips (da75751)
+- **views** Sortable tables for connections, requests and DNS (117c1e9)
+- **ui** Optional two-tier Liquid Glass and slide-to-pick menus (51689f9)
+- **ui** iOS-style surfaces, alerts and sheets; clearer TV focus (6e0ed03)
+
+**Bug Fixes**
+
+- **ui** Fix pasting and Chinese input in text fields (5769f7b)
+- **core** Large profiles no longer crash; downloads trust core CAs (c816c35)
+
+**Performance**
+
+- **android** Smoother Android UI while the proxy is busy (a69413e)
+
+## v0.9.01 (2026-10-15)
+
+**Features**
+
+- **profiles** nowhere proxy type in the custom proxy form (66c9104)
+
+**Bug Fixes**
+
+- Update repository references in release template and changelog tool (28a6599)
+
 ## v0.9.1 (2026-10-17)
 
 **Breaking Changes**
@@ -27,16 +66,6 @@
 **Performance**
 
 - **android** Smoother Android UI while the proxy is busy (2201c19)
-
-## v0.9.101 (2026-10-15)
-
-**Features**
-
-- **profiles** nowhere proxy type in the custom proxy form (66c9104)
-
-**Bug Fixes**
-
-- Update repository references in release template and changelog tool (28a6599)
 
 ## v0.9.0 (2026-10-14)
 
