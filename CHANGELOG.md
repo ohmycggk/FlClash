@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.201 (2026-10-25)
+
+**Bug Fixes**
+
+- **core** Update the embedded core to Nowhere 3.1.1 (4656a0d)
+
 ## v0.9.103 (2026-10-25)
 
 **Bug Fixes**
@@ -8,9 +14,7 @@
 
 ## v0.9.102 (2026-10-25)
 
-**Bug Fixes**
-
-- **core** Update the embedded core to Nowhere 3.1.0 (authenticated Morph TCP prelude, replay registry, silent pre-hello) (1d2e76c)
+Internal improvements only.
 
 ## v0.9.101 (2026-10-22)
 

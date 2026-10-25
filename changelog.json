@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.9.201",
+      "tag": "v0.9.201",
+      "date": "2026-10-25",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "4656a0d",
+              "scope": "core",
+              "text": "Update the embedded core to Nowhere 3.1.1"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.9.103",
       "tag": "v0.9.103",
       "date": "2026-10-25",
@@ -24,18 +42,7 @@
       "tag": "v0.9.102",
       "date": "2026-10-25",
       "prerelease": false,
-      "groups": [
-        {
-          "type": "fix",
-          "entries": [
-            {
-              "id": "1d2e76c",
-              "scope": "core",
-              "text": "Update the embedded core to Nowhere 3.1.0 (authenticated Morph TCP prelude, replay registry, silent pre-hello)"
-            }
-          ]
-        }
-      ]
+      "groups": []
     },
     {
       "version": "0.9.101",
