@@ -213,8 +213,14 @@ The CI Go-wrapper checks can be reproduced without CGO, the Android files includ
 cd core
 CGO_ENABLED=0 go test .
 CGO_ENABLED=0 go vet . ./cmd/...
-GOOS=android GOARCH=arm64 CGO_ENABLED=0 go vet -tags=with_gvisor . ./mobile ./tun ./platform
+GOOS=android GOARCH=arm64 CGO_ENABLED=0 go vet -tags=with_gvisor,no_auto_inbound . ./mobile ./tun ./platform
 ```
+
+The tag list must mirror `build_config.yaml` (`tags:`); `no_auto_inbound` keeps `executor.ApplyConfig`
+from starting inbound listeners itself, which is the wrapper's job. Prefix the commands with
+`GOWORK=off` on a checkout that sits under a parent Go workspace — the build hook and the Android
+`:core` task force the same, because a workspace replace would compile another mihomo checkout than
+the vendored submodule.
 
 The Windows Helper's loopback/session protocol tests are host-independent by default. Windows CI additionally enables its
 service implementation:
