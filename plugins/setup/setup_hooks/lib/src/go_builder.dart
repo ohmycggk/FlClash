@@ -77,6 +77,10 @@ class GoBuilder {
     'GOOS': target.goos,
     'GOARCH': target.goarch,
     'CGO_ENABLED': '0',
+    // Build hooks run in a stripped environment, so a go.work above the
+    // repository is still discovered; its replace would compile another
+    // checkout of mihomo than the vendored submodule.
+    'GOWORK': 'off',
   };
 
   // Package-level vars in mihomo copy constant.Version during init, so only the

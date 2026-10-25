@@ -126,9 +126,13 @@ abstract class GomobileBind : DefaultTask() {
         val path =
             listOf(tools, File(System.getProperty("java.home"), "bin"), File(go).parentFile)
                 .joinToString(File.pathSeparator) { it.path } + File.pathSeparator + System.getenv("PATH").orEmpty()
+        // Go discovers a go.work above the checkout on its own, and a workspace
+        // replace would compile another mihomo checkout than the vendored
+        // submodule, so every go invocation here stays in module mode.
         execOperations.exec {
             workingDir(moduleDirectory)
             environment("PATH", path)
+            environment("GOWORK", "off")
             commandLine(go, "build", "-o", tools.path + File.separator, "golang.org/x/mobile/cmd/gomobile", "golang.org/x/mobile/cmd/gobind")
         }
         // gomobile links the library as the main package of a module it generates, whose go line is the toolchain's,
@@ -137,12 +141,14 @@ abstract class GomobileBind : DefaultTask() {
         execOperations.exec {
             workingDir(moduleDirectory)
             environment("PATH", path)
+            environment("GOWORK", "off")
             commandLine(go, "list", "-f", "{{.DefaultGODEBUG}}", "./cmd/core")
             standardOutput = godebug
         }
         execOperations.exec {
             workingDir(moduleDirectory)
             environment("PATH", path)
+            environment("GOWORK", "off")
             environment("ANDROID_HOME", sdkDirectory.get().asFile.path)
             environment("ANDROID_NDK_HOME", ndkDirectory.get().asFile.path)
             commandLine(
