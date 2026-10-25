@@ -1,10 +1,14 @@
 # Changelog
 
-## v0.9.102 (2026-10-25)
+## v0.9.103 (2026-10-25)
 
 **Bug Fixes**
 
-- **core** Update the embedded core to Nowhere 3.1.0 (authenticated Morph TCP prelude, replay registry, silent pre-hello) (1d2e76c)
+- **core** Update the embedded core so nw3 file certificates load from disk (b96daeb)
+
+## v0.9.102 (2026-10-25)
+
+Internal improvements only.
 
 ## v0.9.101 (2026-10-22)
 
@@ -44,34 +48,6 @@
 **Bug Fixes**
 
 - Update repository references in release template and changelog tool (28a6599)
-
-## v0.9.1 (2026-10-17)
-
-**Breaking Changes**
-
-- **network** Desktop TUN keys follow the profile unless picked; changed values carry over (cb08088)
-
-**Features**
-
-- **l10n** French, Spanish and Korean translations (f43755c)
-- **android** No more Firebase analytics or crash reporting (bc72bba)
-- **network** Per-key desktop TUN settings; system proxy and tray fixes (cb08088)
-- **theme** Redesigned theme colors and color styles (5eafd7a)
-- **dashboard** A redesigned dashboard around the current exit (9bd258f)
-- **profiles** Profile-detail resources and include-all in custom groups (0bac500)
-- **proxies** Proxy groups as cards, group tabs as chips (2ea52fd)
-- **views** Sortable tables for connections, requests and DNS (da6fb0a)
-- **ui** Optional two-tier Liquid Glass and slide-to-pick menus (7c9627f)
-- **ui** iOS-style surfaces, alerts and sheets; clearer TV focus (9bd2286)
-
-**Bug Fixes**
-
-- **ui** Fix pasting and Chinese input in text fields (5607f70)
-- **core** Large profiles no longer crash; downloads trust core CAs (5984c16)
-
-**Performance**
-
-- **android** Smoother Android UI while the proxy is busy (2201c19)
 
 ## v0.9.0 (2026-10-14)
 
@@ -116,26 +92,6 @@
 - **proxies** Smaller icons in icon-only group headers (786a6ab)
 - **core,android** Push notifications reconnect in Doze (1e9955d)
 - **backup,database** Restores never apply halfway (bee8f24)
-
-## v0.8.9801 (2026-09-23)
-
-**Bug Fixes**
-
-- Update repository references in release template and changelog tool (1620512)
-
-## v0.8.9603 (2026-09-23)
-
-**Bug Fixes**
-
-- Update repository references in release template and changelog tool (1620512)
-
-## v0.8.9602 (2026-09-23)
-
-Internal improvements only.
-
-## v0.8.9601 (2026-09-23)
-
-Internal improvements only.
 
 ## v0.8.98 (2026-09-14)
 

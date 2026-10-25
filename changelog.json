@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "versions": [
     {
-      "version": "0.9.102",
-      "tag": "v0.9.102",
+      "version": "0.9.103",
+      "tag": "v0.9.103",
       "date": "2026-10-25",
       "prerelease": false,
       "groups": [
@@ -11,13 +11,20 @@
           "type": "fix",
           "entries": [
             {
-              "id": "1d2e76c",
+              "id": "b96daeb",
               "scope": "core",
-              "text": "Update the embedded core to Nowhere 3.1.0 (authenticated Morph TCP prelude, replay registry, silent pre-hello)"
+              "text": "Update the embedded core so nw3 file certificates load from disk"
             }
           ]
         }
       ]
+    },
+    {
+      "version": "0.9.102",
+      "tag": "v0.9.102",
+      "date": "2026-10-25",
+      "prerelease": false,
+      "groups": []
     },
     {
       "version": "0.9.101",
@@ -123,7 +130,7 @@
       ]
     },
     {
-      "version": "0.9.01",
+      "version": "0.9.1",
       "tag": "v0.9.01",
       "date": "2026-10-15",
       "prerelease": false,
@@ -144,104 +151,6 @@
             {
               "id": "28a6599",
               "text": "Update repository references in release template and changelog tool"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.9.1",
-      "tag": "v0.9.1",
-      "date": "2026-10-17",
-      "prerelease": false,
-      "groups": [
-        {
-          "type": "breaking",
-          "entries": [
-            {
-              "id": "cb08088",
-              "scope": "network",
-              "text": "Desktop TUN keys follow the profile unless picked; changed values carry over"
-            }
-          ]
-        },
-        {
-          "type": "feat",
-          "entries": [
-            {
-              "id": "f43755c",
-              "scope": "l10n",
-              "text": "French, Spanish and Korean translations"
-            },
-            {
-              "id": "bc72bba",
-              "scope": "android",
-              "text": "No more Firebase analytics or crash reporting"
-            },
-            {
-              "id": "cb08088",
-              "scope": "network",
-              "text": "Per-key desktop TUN settings; system proxy and tray fixes"
-            },
-            {
-              "id": "5eafd7a",
-              "scope": "theme",
-              "text": "Redesigned theme colors and color styles"
-            },
-            {
-              "id": "9bd258f",
-              "scope": "dashboard",
-              "text": "A redesigned dashboard around the current exit"
-            },
-            {
-              "id": "0bac500",
-              "scope": "profiles",
-              "text": "Profile-detail resources and include-all in custom groups"
-            },
-            {
-              "id": "2ea52fd",
-              "scope": "proxies",
-              "text": "Proxy groups as cards, group tabs as chips"
-            },
-            {
-              "id": "da6fb0a",
-              "scope": "views",
-              "text": "Sortable tables for connections, requests and DNS"
-            },
-            {
-              "id": "7c9627f",
-              "scope": "ui",
-              "text": "Optional two-tier Liquid Glass and slide-to-pick menus"
-            },
-            {
-              "id": "9bd2286",
-              "scope": "ui",
-              "text": "iOS-style surfaces, alerts and sheets; clearer TV focus"
-            }
-          ]
-        },
-        {
-          "type": "fix",
-          "entries": [
-            {
-              "id": "5607f70",
-              "scope": "ui",
-              "text": "Fix pasting and Chinese input in text fields"
-            },
-            {
-              "id": "5984c16",
-              "scope": "core",
-              "text": "Large profiles no longer crash; downloads trust core CAs"
-            }
-          ]
-        },
-        {
-          "type": "perf",
-          "entries": [
-            {
-              "id": "2201c19",
-              "scope": "android",
-              "text": "Smoother Android UI while the proxy is busy"
             }
           ]
         }
@@ -412,54 +321,6 @@
           ]
         }
       ]
-    },
-    {
-      "version": "0.8.9801",
-      "tag": "v0.8.9801",
-      "date": "2026-09-23",
-      "prerelease": false,
-      "groups": [
-        {
-          "type": "fix",
-          "entries": [
-            {
-              "id": "1620512",
-              "text": "Update repository references in release template and changelog tool"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.8.9603",
-      "tag": "v0.8.9603",
-      "date": "2026-09-23",
-      "prerelease": false,
-      "groups": [
-        {
-          "type": "fix",
-          "entries": [
-            {
-              "id": "1620512",
-              "text": "Update repository references in release template and changelog tool"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "version": "0.8.9602",
-      "tag": "v0.8.9602",
-      "date": "2026-09-23",
-      "prerelease": false,
-      "groups": []
-    },
-    {
-      "version": "0.8.9601",
-      "tag": "v0.8.9601",
-      "date": "2026-09-23",
-      "prerelease": false,
-      "groups": []
     },
     {
       "version": "0.8.98",
