@@ -24,7 +24,18 @@
       "tag": "v0.9.102",
       "date": "2026-10-25",
       "prerelease": false,
-      "groups": []
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "1d2e76c",
+              "scope": "core",
+              "text": "Update the embedded core to Nowhere 3.1.0 (authenticated Morph TCP prelude, replay registry, silent pre-hello)"
+            }
+          ]
+        }
+      ]
     },
     {
       "version": "0.9.101",
