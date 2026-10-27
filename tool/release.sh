@@ -16,7 +16,7 @@ usage() {
 Usage: tool/release.sh <pre|stable> [options]
 
   pre                Tag the next vX.Y.Z-pre.N prerelease.
-  stable             Write the changelog, commit it, and tag vX.Y.Z.
+  stable             Bump the version, commit it, and tag vX.Y.Z.
 
 Options:
   --version X.Y.Z    Target app version. Defaults to the pubspec version,
@@ -27,7 +27,7 @@ Options:
   -h, --help         Show this help.
 
 Examples:
-  tool/release.sh pre --push          # v0.8.97-pre.1, notes rendered by CI
+  tool/release.sh pre --push          # v0.8.97-pre.1
   tool/release.sh stable --push       # v0.8.97 with a chore(release) commit
 EOF
 }
@@ -122,10 +122,8 @@ echo "branch    : $branch"
 echo "version   : $current -> $version$([[ $bumped == 1 ]] && echo ' (pubspec will be rewritten)')"
 echo "tag       : $tag"
 if [[ "$mode" == "pre" ]]; then
-  echo "changelog : rendered by CI from build --unreleased; nothing committed"
-  echo "publishes : build artifacts + Telegram only, no GitHub release"
+  echo "publishes : build artifacts only, no GitHub release"
 else
-  echo "changelog : CHANGELOG.md + changelog.json regenerated and committed"
   echo "publishes : GitHub release with artifacts, SHA256SUMS, Homebrew cask"
 fi
 echo "push      : $([[ $do_push == 1 ]] && echo yes || echo 'no (printed at the end)')"
@@ -134,7 +132,7 @@ echo
 committed=0
 restore() {
   ((committed)) && return 0
-  git checkout -- pubspec.yaml changelog.json CHANGELOG.md 2>/dev/null || true
+  git checkout -- pubspec.yaml 2>/dev/null || true
 }
 trap restore EXIT
 
@@ -143,17 +141,6 @@ if ((bumped)); then
   rm -f pubspec.yaml.bak
 fi
 tool/bump_version.sh minor
-
-echo "--- release notes for $tag ---"
-if dart run tool/changelog.dart build --unreleased >/dev/null 2>&1; then
-  dart run tool/changelog.dart render release 2>/dev/null |
-    sed -n '/changelog:begin/,/changelog:end/p' | sed '1d;$d'
-else
-  echo "(preview unavailable: 'build --unreleased' found nothing to collect)"
-fi
-git checkout -- changelog.json 2>/dev/null || true
-echo "--- end of notes ---"
-echo
 
 if ((dry_run)); then
   echo "dry run: nothing was changed."
@@ -179,14 +166,12 @@ if ((assume_yes == 0)); then
 fi
 
 if [[ "$mode" == "stable" ]]; then
-  dart run tool/changelog.dart release --version "$version"
   echo
-  git --no-pager diff --stat -- CHANGELOG.md changelog.json pubspec.yaml
+  git --no-pager diff --stat -- pubspec.yaml
   echo
-  git add CHANGELOG.md changelog.json pubspec.yaml
+  git add pubspec.yaml
   git commit -m "chore(release): v$version"
   committed=1
-  dart run tool/changelog.dart verify
 elif ! git diff --quiet -- pubspec.yaml; then
   git add pubspec.yaml
   git commit -m "chore: bump version to $(sed -n 's/^version: //p' pubspec.yaml)"

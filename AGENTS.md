@@ -69,6 +69,12 @@ Read these only when the task touches their area:
 - Before reporting a change done, run `flutter pub get`, `flutter analyze --no-fatal-infos`, and the `flutter test`
   suites that cover it, as CI does. If a toolchain the build hook needs is missing (Go, and on Linux and Windows
   cargo), say which check was skipped rather than dropping it silently.
+- Do not maintain or gate on a changelog. Never add a CI step, release step, or commit hook that runs
+  `tool/changelog.dart` (`verify`, `release`, `build`, or `render`), regenerates `CHANGELOG.md` or `changelog.json`,
+  or fails a build because a commit is not conventional or a tag is missing from the changelog. The maintainer does
+  not use this pipeline; it has repeatedly blocked releases. GitHub release bodies come from
+  `.github/release_template.md` only. Leave the existing changelog tool, app parser, and committed files in place
+  unless asked to delete them, and do not revive them as a required workflow.
 
 ## Repo Skills
 

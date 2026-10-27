@@ -64,10 +64,6 @@ jobs:
         run: |
           yq -i '.hooks.user_defines.setup.build_assets = false' pubspec.yaml
 
-      - name: Verify changelog
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-        run: dart run tool/changelog.dart verify
-
       - name: Run tests
         run: dart run tool/test.dart -- --reporter expanded --coverage
 
@@ -497,25 +493,12 @@ jobs:
 
       - name: Generate release notes
         shell: bash
-        env:
-          IS_STABLE: ${{ env.IS_STABLE }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          target=()
-          if [[ "$IS_STABLE" == 'true' ]]; then
-            target=(--tag "$TAG")
-          else
-            dart run tool/changelog.dart build --unreleased
-          fi
-          dart run tool/changelog.dart render release "${target[@]}" --out release.md
-
-      - name: Patch release.md
         run: |
           version=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           sed \
             -e "s|VERSION|$version|g" \
             -e "s|REPOSITORY|${{ github.repository }}|g" \
-            ./.github/release_template.md >> release.md
+            .github/release_template.md > release.md
 
       - name: Generate sha256
         if: ${{ env.IS_STABLE == 'true' }}

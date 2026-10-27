@@ -53,7 +53,7 @@ hooks:
 ```
 
 CI flips `setup` to `false` with `yq` in its throwaway checkout before
-`dart run tool/changelog.dart` and `dart run tool/test.dart`; no test loads the Go core. `rust_api`
+`dart run tool/test.dart`; no test loads the Go core. `rust_api`
 stays on there because the editor tests in `test/plugins/code_forge/` and the socket
 test in `test/core/desktop/ipc_native_test.dart` load the Rust library the hook
 builds; the release-notes job, which runs no tests, flips both.
@@ -246,30 +246,21 @@ export JAVA_HOME="$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
 Always-on VPN entry, system VPN revoke, actual permission UI, and rapid device start/stop still require Android device or
 emulator validation; Kotlin compilation cannot prove those system callbacks.
 
-## Changelog And Release
+## Release
 
-The changelog is derived from Conventional Commits by `tool/changelog.dart` and written to two committed files:
-`CHANGELOG.md` for readers and `changelog.json` for the renderers. See `.agents/rules.md` for the `Changelog:` trailers
-that decide the wording.
+Do not run the changelog pipeline. `tool/changelog.dart` (`verify`, `release`, `build`, `render`) is not part of CI,
+`tool/release.sh`, or the commit hooks, and it must not be put back. It blocked releases whenever a commit was not a
+Conventional Commit or a tag was missing from `changelog.json`. `CHANGELOG.md` and `changelog.json` stay as historical
+files; nothing regenerates them, and a release does not wait on them.
 
-The app ships no changelog of its own. `render release` appends the released version as JSON inside an HTML comment
-(`<!-- flclash:changelog:json … -->`), so the release body GitHub already returns to `checkForUpdate` carries the
-notes shown in the update dialog. `parseReleaseChangelog` reads that block and falls back to the English
-bullets when a release predates it.
-
-```bash
-dart run tool/changelog.dart verify                  # what CI checks
-dart run tool/changelog.dart release --version 0.8.96
-dart run tool/changelog.dart build --unreleased      # changelog.json only, includes untagged work
-dart run tool/changelog.dart render release --out release.md
-dart run tool/changelog.dart render telegram --out telegram.md
-```
+The GitHub release body is `.github/release_template.md` copied to `release.md`, with `VERSION` and `REPOSITORY`
+filled in. The update dialog still reads a `<!-- flclash:changelog:json … -->` block when an old release body has one,
+and otherwise shows the English bullets between the changelog markers.
 
 Releasing a stable version, in order:
 
 ```bash
 tool/bump_version.sh all
-dart run tool/changelog.dart release --version 0.8.96
 git commit -am "chore(release): v0.8.96"
 git tag v0.8.96
 git push origin main && git push origin v0.8.96
@@ -278,41 +269,23 @@ git push origin main && git push origin v0.8.96
 Push the tag by name. Every release tag here is lightweight, and `--follow-tags` carries annotated tags only: it skips a
 lightweight one silently, so the branch lands, the tag does not, and the release workflow never fires.
 
-`tool/release.sh` drives both paths so the ordering below cannot be got wrong by hand. It resolves the version (bumping
-the patch when pubspec still names an already tagged one), prints the notes the tag would ship, and only pushes with
-`--push`:
+`tool/release.sh` drives both paths. It resolves the version (bumping the patch when pubspec still names an already
+tagged one) and only pushes with `--push`:
 
 ```bash
-tool/release.sh pre --dry-run     # plan and notes, changes nothing
+tool/release.sh pre --dry-run     # plan only, changes nothing
 tool/release.sh pre --push        # bump, tag vX.Y.Z-pre.N, push
-tool/release.sh stable --push     # changelog, chore(release) commit, tag, push
+tool/release.sh stable --push     # chore(release) commit, tag, push
 ```
 
-The release commit comes before the tag on purpose: the generated wording is reviewable in the diff before it ships, and
-the tag is what `render release` reads. CI never writes back to the repository; it only runs `verify`. Wording in
-`changelog.json` may be edited by hand as long as no derivable entry disappears and every entry still points at a commit
-inside that version's range.
-
-Entries at or below `v0.8.96` are frozen: they predate the pipeline, live under the `<!-- changelog:frozen -->` marker
-in `CHANGELOG.md`, and are never regenerated.
-
-`verify` compares a version only when its tag is reachable from `HEAD`, because that is the same scope the builder walks
-(`git tag --merged`). A branch cut before the newest release cannot derive that version at all, so `verify` names it as
-skipped and moves on instead of reporting drift that does not exist. Checking mere tag existence is what made every such
-branch fail on an unrelated release.
-
-Prerelease tags (`v0.8.96-pre.N`) skip the release commit, and CI renders their notes with `build --unreleased` for the
-Telegram post. They publish no GitHub release, so the update dialog never sees them. `build --unreleased` reads the
-version from `pubspec.yaml` rather than the tag, so the patch has to be bumped before the first `-pre.N` of a cycle:
-while `v<pubspec version>` is still tagged it refuses to collect anything and the release job fails.
+Prerelease tags (`v0.8.96-pre.N`) publish no GitHub release.
 
 This fork releases on top of an upstream base: pubspec.yaml carries the upstream version line, and the release tag owns
 the version name. The build job's "Set version from tag" step rewrites pubspec from the pushed tag, keeping the
 `+build` number, so a tag `v0.9.11` builds as `0.9.11+<build>` and the app update channel serves it from this
-repository. Both version tools resolve from pubspec, which names the upstream base, so a fork release always passes the
-number explicitly — `tool/release.sh stable --version 0.9.11 --push` or
-`dart run tool/changelog.dart release --version 0.9.11` — instead of letting the default resolution pick an upstream
-number. The core submodule pin has to exist on `clash-meta-nw` before the tag pushes; see Core API Safety in
+repository. A fork release always passes the number explicitly —
+`tool/release.sh stable --version 0.9.11 --push` — instead of letting the default resolution pick an upstream number.
+The core submodule pin has to exist on `clash-meta-nw` before the tag pushes; see Core API Safety in
 `.agents/rules.md`.
 
 ### Website
@@ -355,7 +328,6 @@ bash tool/hooks/test.sh
 flutter pub get
 dart format --output=none --set-exit-if-changed lib test tool plugins setup.dart
 flutter analyze --no-fatal-infos
-dart run tool/changelog.dart verify   # main and tags only
 flutter test --reporter expanded --coverage
 dart run tool/check_coverage.dart coverage/lcov.info 75
 ```

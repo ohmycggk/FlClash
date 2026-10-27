@@ -589,29 +589,12 @@ commit that introduced what it amends.
 - Asking for a fixup means creating the `fixup!` commit only. Do not run `git rebase --autosquash` or otherwise fold it
   into its target unless the user asks for the squash.
 
-### Changelog Trailers
+### Changelog
 
-`tool/changelog.dart` builds the user facing changelog from the commit history, so the trailers below are the copy that
-ships to users. The subject stays the developer facing summary and is only the fallback.
-
-```text
-feat(profiles): support per-profile override script
-
-Changelog: Per-profile override scripts
-```
-
-- `Changelog:` is the English entry. `Changelog: skip` drops the commit from the changelog entirely.
-- The changelog is English only. A `Changelog-<locale>:` or `Breaking-<locale>:` trailer fails the hook, because
-  translated release copy does not belong in the commit history. Translate after the fact if ever needed, not in the
-  commit message.
-- `Changelog-Type:` moves an entry into another group, for example to promote a `refactor` that users will notice. Valid
-  values are `breaking`, `feat`, `fix`, `perf`, `revert`.
-- `BREAKING CHANGE:` is required whenever the subject carries `!`, and its text becomes the breaking entry. A `!` commit
-  therefore needs two lines of copy: the footer for the breaking entry and `Changelog:` for the normal one.
-
-`feat`, `fix`, `perf`, `revert` and breaking commits are collected by default; every other type is dropped unless it
-carries a `Changelog:` trailer. Commits missing a trailer reuse their subject; for `feat`, `fix` and `perf` the hook
-says so without blocking.
+There is no changelog to maintain. Do not add `Changelog:` trailers, do not regenerate `CHANGELOG.md` or
+`changelog.json`, and do not run `tool/changelog.dart`. CI and `tool/release.sh` no longer call it; putting a `verify`
+step back on `main` or on tags is what blocked releases. `BREAKING CHANGE:` is still required when the subject carries
+`!`, because the commit-msg hook checks that footer, not because a changelog consumes it.
 
 ## Migrations
 
