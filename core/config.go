@@ -195,7 +195,7 @@ func updateConfig(params *UpdateParams) error {
 	if params.IPv6 != nil {
 		routeChanged = routeChanged || general.IPv6 != *params.IPv6
 		general.IPv6 = *params.IPv6
-		resolver.DisableIPv6 = !general.IPv6
+		resolver.DisableIPv6.Store(!general.IPv6)
 	}
 	if params.Tun != nil {
 		patchTun(&general.Tun, params.Tun)
