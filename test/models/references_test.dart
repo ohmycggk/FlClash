@@ -100,6 +100,7 @@ void main() {
           'parseDomain',
           'parseIPRuleSet',
           'parseDomainRuleSet',
+          'closeRuleProviders',
         },
       );
     });
