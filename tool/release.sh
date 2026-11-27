@@ -7,7 +7,9 @@ cd "$root"
 
 mode=""
 want_version=""
+rebuild=0
 do_push=0
+remote=origin
 assume_yes=0
 dry_run=0
 
@@ -15,20 +17,27 @@ usage() {
   cat <<'EOF'
 Usage: tool/release.sh <pre|stable> [options]
 
-  pre                Tag the next vX.Y.Z-pre.N prerelease.
-  stable             Bump the version, commit it, and tag vX.Y.Z.
+  pre                Tag the next vX.Y.Z-pre.N prerelease on HEAD, no commit.
+  stable             Bump pubspec when needed, commit it, and tag vX.Y.Z.
+
+CI takes the app version from the tag and the build number from the clock,
+so neither mode writes a build number into pubspec.yaml.
 
 Options:
   --version X.Y.Z    Target app version. Defaults to the pubspec version,
                      bumping the patch when that version is already tagged.
+  --rebuild          With pre: tag vX.Y.Z-pre.N+M, rebuilding the newest
+                     prerelease N instead of starting N+1.
   --push             Push the branch and the tag once the local steps pass.
+  --remote NAME      Remote to push to (default origin).
   --yes              Skip the confirmation prompt.
   --dry-run          Report the plan and exit without changing anything.
   -h, --help         Show this help.
 
 Examples:
-  tool/release.sh pre --push          # v0.8.97-pre.1
-  tool/release.sh stable --push       # v0.8.97 with a chore(release) commit
+  tool/release.sh pre --push            # v0.8.97-pre.1
+  tool/release.sh pre --rebuild --push  # v0.8.97-pre.1+1 after a fix
+  tool/release.sh stable --push         # v0.8.97 with a chore(release) commit
 EOF
 }
 
@@ -48,7 +57,13 @@ while (($#)); do
       want_version="$1"
       ;;
     --version=*) want_version="${1#*=}" ;;
+    --rebuild) rebuild=1 ;;
     --push) do_push=1 ;;
+    --remote)
+      shift || die "--remote needs a value"
+      remote="$1"
+      ;;
+    --remote=*) remote="${1#*=}" ;;
     --yes | -y) assume_yes=1 ;;
     --dry-run) dry_run=1 ;;
     -h | --help)
@@ -108,25 +123,38 @@ if [[ "$version" != "$current" ]]; then
   bumped=1
 fi
 
-if [[ "$mode" == "pre" ]]; then
-  last="$(git tag --list "v$version-pre.*" |
-    sed -n "s/^v$version-pre\.\([0-9]*\)$/\1/p" | sort -n | tail -1)"
-  tag="v$version-pre.$(((${last:-0}) + 1))"
+if [[ "$mode" != "stable" ]]; then
+  last="$(git tag --list "v$version-$mode.*" |
+    sed -n "s/^v$version-$mode\.\([0-9]*\)\(+[0-9]*\)\{0,1\}$/\1/p" | sort -n | tail -1)"
+  if ((rebuild)); then
+    [[ -n "$last" ]] || die "no v$version-$mode.N to rebuild; run without --rebuild first"
+    builds="$(git tag --list "v$version-$mode.$last+*" |
+      sed -n "s/^v$version-$mode\.$last+\([0-9]*\)$/\1/p" | sort -n | tail -1)"
+    tag="v$version-$mode.$last+$(((${builds:-0}) + 1))"
+  else
+    tag="v$version-$mode.$(((${last:-0}) + 1))"
+  fi
 else
+  ((rebuild == 0)) || die "--rebuild only applies to pre"
   tag="v$version"
+fi
+
+rewritten=""
+if ((bumped)) && [[ "$mode" == "stable" ]]; then
+  rewritten=' (pubspec will be rewritten)'
 fi
 
 echo
 echo "mode      : $mode"
 echo "branch    : $branch"
-echo "version   : $current -> $version$([[ $bumped == 1 ]] && echo ' (pubspec will be rewritten)')"
+echo "version   : $current -> $version$rewritten"
 echo "tag       : $tag"
-if [[ "$mode" == "pre" ]]; then
-  echo "publishes : build artifacts only, no GitHub release"
+if [[ "$mode" != "stable" ]]; then
+  echo "publishes : GitHub prerelease with artifacts and SHA256SUMS"
 else
-  echo "publishes : GitHub release with artifacts, SHA256SUMS, Homebrew cask"
+  echo "publishes : GitHub release with artifacts and SHA256SUMS"
 fi
-echo "push      : $([[ $do_push == 1 ]] && echo yes || echo 'no (printed at the end)')"
+echo "push      : $([[ $do_push == 1 ]] && echo "yes, to $remote" || echo 'no (printed at the end)')"
 echo
 
 committed=0
@@ -136,11 +164,10 @@ restore() {
 }
 trap restore EXIT
 
-if ((bumped)); then
+if ((bumped)) && [[ "$mode" == "stable" ]]; then
   sed -i.bak "s/^version: [0-9]*\.[0-9]*\.[0-9]*/version: $version/" pubspec.yaml
   rm -f pubspec.yaml.bak
 fi
-tool/bump_version.sh minor
 
 if ((dry_run)); then
   echo "dry run: nothing was changed."
@@ -165,18 +192,12 @@ if ((assume_yes == 0)); then
   done
 fi
 
-if [[ "$mode" == "stable" ]]; then
+if [[ "$mode" == "stable" ]] && ! git diff --quiet -- pubspec.yaml; then
   echo
   git --no-pager diff --stat -- pubspec.yaml
   echo
   git add pubspec.yaml
   git commit -m "chore(release): v$version"
-  committed=1
-elif ! git diff --quiet -- pubspec.yaml; then
-  git add pubspec.yaml
-  git commit -m "chore: bump version to $(sed -n 's/^version: //p' pubspec.yaml)"
-  committed=1
-else
   committed=1
 fi
 
@@ -184,11 +205,11 @@ git tag "$tag"
 echo "tagged $tag at $(git rev-parse --short HEAD)"
 
 if ((do_push)); then
-  git push origin "$branch"
-  git push origin "$tag"
-  echo "pushed $branch and $tag"
+  git push "$remote" "$branch"
+  git push "$remote" "$tag"
+  echo "pushed $branch and $tag to $remote"
 else
   echo
   echo "Nothing was pushed. To publish:"
-  echo "  git push origin $branch && git push origin $tag"
+  echo "  git push $remote $branch && git push $remote $tag"
 fi

@@ -6,11 +6,11 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/config.dart';
 import 'package:flutter/foundation.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:screen_retriever/screen_retriever.dart';
-import 'package:window/window.dart';
+import 'package:flutter/widgets.dart';
+import 'package:rust_api/window.dart';
 
 class Window implements WindowPort {
+  static const _tintOpacity = 0.5;
   static Window? _instance;
   bool _supportsPosition = false;
   WindowEffect? _blurEffect;
@@ -25,6 +25,8 @@ class Window implements WindowPort {
             : Duration.zero,
       );
 
+  final _shown = ValueNotifier(false);
+
   Window._internal();
 
   factory Window() {
@@ -35,9 +37,7 @@ class Window implements WindowPort {
   Future<void> init(int version, WindowProps props) async {
     if (!safeModeBuild) {
       if (system.isWindows) {
-        for (final scheme in protocolSchemes) {
-          protocol.register(scheme);
-        }
+        unawaited(protocol.registerWindows(protocolSchemes));
       }
       if (system.isLinux) {
         unawaited(protocol.registerLinux(protocolSchemes));
@@ -59,8 +59,10 @@ class Window implements WindowPort {
 
   Future<Size> _defaultSize() async {
     try {
-      final display = await screenRetriever.getPrimaryDisplay();
-      return fittedWindowSize(display.visibleSize ?? display.size);
+      final display = await desktopWindow.getPrimaryDisplay();
+      return display == null
+          ? defaultWindowSize
+          : fittedWindowSize(display.workArea.size);
     } catch (_) {
       return defaultWindowSize;
     }
@@ -74,14 +76,25 @@ class Window implements WindowPort {
         ? null
         : restoredWindowPosition(
             props,
-            displays: await screenRetriever.getAllDisplays(),
+            displays: await desktopWindow.getDisplays(),
             currentScale: system.isWindows ? _windowScale : null,
           );
     if (position == null) {
-      await desktopWindow.setAlignment(Alignment.center);
+      await _center();
     } else {
       await desktopWindow.setPosition(position);
     }
+  }
+
+  Future<void> _center() async {
+    final size = (await desktopWindow.getBounds()).size;
+    await desktopWindow.setPosition(
+      await calcWindowPosition(
+        size,
+        Alignment.center,
+        currentScale: system.isWindows ? _windowScale : null,
+      ),
+    );
   }
 
   double get _windowScale =>
@@ -125,9 +138,11 @@ class Window implements WindowPort {
     if (cached != null) {
       return cached;
     }
+    // Windows 10's acrylic accent makes the window trail the pointer while it
+    // is dragged, so Windows 10 takes the plain accent blur.
     final candidates = system.isMacOS
-        ? const [WindowEffect.blur]
-        : const [WindowEffect.acrylic, WindowEffect.blur];
+        ? const [WindowEffect.glass, WindowEffect.blur]
+        : const [WindowEffect.mica, WindowEffect.blur];
     for (final effect in candidates) {
       if (await desktopWindow.isEffectSupported(effect)) {
         return _blurEffect = effect;
@@ -136,25 +151,26 @@ class Window implements WindowPort {
     return WindowEffect.none;
   }
 
-  /// Only Windows 10's accent blur uses the tint; it draws nothing without one.
+  /// Only Windows 10's accent blur takes the tint natively; it draws nothing
+  /// without one. Every material still keeps the sidebar's own color half over
+  /// it, or the rail takes the hue of whatever lies behind the window while
+  /// the content beside it keeps the theme's.
   @override
-  Future<bool> setBlur({
+  Future<double?> setBlur({
     required bool enabled,
     required Brightness brightness,
     required Color tint,
   }) async {
     if (system.isLinux) {
-      return false;
+      return null;
     }
     final effect = enabled ? await _resolveBlurEffect() : WindowEffect.none;
     await desktopWindow.setEffect(
       effect,
-      tint: system.isWindows
-          ? tint.withValues(alpha: kSidebarBlurOpacity)
-          : null,
+      tint: system.isWindows ? tint.withValues(alpha: _tintOpacity) : null,
       brightness: brightness,
     );
-    return effect != WindowEffect.none;
+    return effect == WindowEffect.none ? null : _tintOpacity;
   }
 
   /// Every desktop runner leaves the window hidden until [init] reveals it, so
@@ -169,7 +185,7 @@ class Window implements WindowPort {
         return;
       }
       await desktopWindow.setSize(const Size(680, 580));
-      await desktopWindow.center();
+      await _center();
       await desktopWindow.show();
       await desktopWindow.focus();
     } catch (e) {
@@ -179,6 +195,9 @@ class Window implements WindowPort {
       );
     }
   }
+
+  /// Whether [show] or [hide] ran last; the window starts hidden.
+  ValueListenable<bool> get shown => _shown;
 
   @override
   Future<void> show() => _visibility.show();
@@ -190,12 +209,23 @@ class Window implements WindowPort {
   Future<void> toggle() => _visibility.toggle();
 
   Future<void> _showWindow() async {
-    await desktopWindow.show();
+    await _turn(true, desktopWindow.show);
     await desktopWindow.focus();
   }
 
-  Future<void> _hideWindow() async {
-    await desktopWindow.hide();
+  Future<void> _hideWindow() => _turn(false, desktopWindow.hide);
+
+  /// Turns [shown] ahead of the platform, so focus goes before the window
+  /// does, and back where the platform refuses.
+  Future<void> _turn(bool shown, Future<void> Function() platform) async {
+    final was = _shown.value;
+    _shown.value = shown;
+    try {
+      await platform();
+    } catch (_) {
+      _shown.value = was;
+      rethrow;
+    }
   }
 
   Future<bool> _isWindowVisible() async {
@@ -213,6 +243,38 @@ class Window implements WindowPort {
   }
 }
 
+@visibleForTesting
+Future<Offset> calcWindowPosition(
+  Size windowSize,
+  Alignment alignment, {
+  double? currentScale,
+}) async {
+  final displays = await desktopWindow.getDisplays();
+  final cursor = await desktopWindow.getCursorPosition();
+  final currentDisplay =
+      displays
+          .where((display) => display.bounds.contains(cursor))
+          .firstOrNull ??
+      await desktopWindow.getPrimaryDisplay();
+  if (currentDisplay == null) {
+    return Offset.zero;
+  }
+
+  final landedSize = currentScale == null
+      ? windowSize
+      : windowSize * (currentDisplay.scaleFactor / currentScale);
+  final visibleSize = currentDisplay.workArea.size;
+  final visibleStart = currentDisplay.workArea.topLeft;
+  final slack = Offset(
+    visibleSize.width - landedSize.width,
+    visibleSize.height - landedSize.height,
+  );
+  return Offset(
+    visibleStart.dx + slack.dx / 2 + alignment.x * slack.dx / 2,
+    visibleStart.dy + slack.dy / 2 + alignment.y * slack.dy / 2,
+  );
+}
+
 /// Keeps a margin of the work area around a first window on a small screen.
 @visibleForTesting
 Size fittedWindowSize(Size visible) => Size(
@@ -220,36 +282,30 @@ Size fittedWindowSize(Size visible) => Size(
   math.min(defaultWindowSize.height, visible.height * 0.9),
 );
 
-/// On Windows the plugin scales by the window's monitor and screen_retriever by
-/// each display's own, so only physical pixels compare across mixed scales.
 @visibleForTesting
 Offset? restoredWindowPosition(
   WindowProps props, {
-  required List<Display> displays,
+  required List<DesktopDisplay> displays,
   double? currentScale,
 }) {
-  final savedScale = currentScale == null ? 1.0 : props.scale ?? currentScale;
-  final topLeft = Offset(props.left!, props.top!) * savedScale;
-  final bottomRight =
-      topLeft + props.size.bottomRight(Offset.zero) * savedScale;
-  final isVisible = displays.any((display) {
-    final position = display.visiblePosition;
-    if (position == null) {
-      return false;
+  final scale = currentScale == null
+      ? 1.0
+      : (props.scale ?? currentScale) / currentScale;
+  final topLeft = Offset(props.left!, props.top!) * scale;
+  final size = props.size * scale;
+  final titleBar = topLeft & Size(size.width, kHeaderHeight * scale);
+  var visibleWidth = 0.0;
+  for (final display in displays) {
+    final area = display.workArea;
+    if (titleBar.top < area.top || titleBar.bottom > area.bottom) {
+      continue;
     }
-    final scale = currentScale == null
-        ? 1.0
-        : display.scaleFactor?.toDouble() ?? 1.0;
-    final bounds = position & display.size;
-    final physical = Rect.fromLTRB(
-      bounds.left * scale,
-      bounds.top * scale,
-      bounds.right * scale,
-      bounds.bottom * scale,
+    visibleWidth += math.max(
+      0,
+      math.min(titleBar.right, area.right) - math.max(titleBar.left, area.left),
     );
-    return physical.contains(topLeft) || physical.contains(bottomRight);
-  });
-  return isVisible ? topLeft / (currentScale ?? 1.0) : null;
+  }
+  return visibleWidth >= titleBar.width / 2 ? topLeft : null;
 }
 
 class _InitFailureWindowListener with WindowListener {

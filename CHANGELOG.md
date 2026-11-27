@@ -1,59 +1,166 @@
 # Changelog
 
-## v0.9.201 (2026-10-25)
-
-**Bug Fixes**
-
-- **core** Update the embedded core to Nowhere 3.1.1 (4656a0d)
-
-## v0.9.103 (2026-10-25)
-
-**Bug Fixes**
-
-- **core** Update the embedded core so nw3 file certificates load from disk (b96daeb)
-
-## v0.9.102 (2026-10-25)
-
-Internal improvements only.
-
-## v0.9.101 (2026-10-22)
-
-**Breaking Changes**
-
-- **network** Desktop TUN keys follow the profile unless picked; changed values carry over (b42da00)
+## v0.9.5 (2026-11-26)
 
 **Features**
 
-- **profiles** Pick the proxy type from a two-column grid (04bb2d0)
-- **l10n** French, Spanish and Korean translations (9f32447)
-- **android** No more Firebase analytics or crash reporting (a9fa096)
-- **network** Per-key desktop TUN settings; system proxy and tray fixes (b42da00)
-- **theme** Redesigned theme colors and color styles (c27546e)
-- **dashboard** A redesigned dashboard around the current exit (1d2900c)
-- **profiles** Profile-detail resources and include-all in custom groups (42c976a)
-- **proxies** Proxy groups as cards, group tabs as chips (da75751)
-- **views** Sortable tables for connections, requests and DNS (117c1e9)
-- **ui** Optional two-tier Liquid Glass and slide-to-pick menus (51689f9)
-- **ui** iOS-style surfaces, alerts and sheets; clearer TV focus (6e0ed03)
+- **about** Icons and even spacing for the update settings on the About page (1951468)
+- **window** Pause live updates on desktop while the screen is asleep or locked (0981835)
+- **update** Install macOS updates from inside the app (73a0182)
+- **proxies** Proxy groups unfold smoothly as one block (94288d7)
+- **connection** Connection, request, DNS, outbound IP and log details use smaller text with more room (a27fab5)
+- **prism_ui** List rows follow a smaller text size, as they already did a larger one (83214b6)
+- **prism_ui** The phone tab bar spaces five tabs and sets out icons and labels as iOS does (219bc95)
+- **about** The automatic update check and the update channel moved from General settings to the About page (7b97a68)
+- **logs** Filter logs from a button beside search (0db670d)
+- **logs** Set the log level from the Logs page (ef7dc6e)
+- **requests** Connections become Requests: connections by minute with All, Active and Failed counts, conditions on app, exit, rule or protocol, a timeline for each connection, DNS queries, segments that keep their place, and new rows held under a desktop pointer (9c931f7)
+- **update** Choose between stable and prerelease updates in the settings; the prerelease check finds the newest release and names the installed prerelease (562e11f)
+- **ui** Lists and cards share one set of margins, so rows line up across pages (8fc8909)
+- **dashboard** The dashboard's outbound mode card is titled Outbound, leaving its mode buttons more room (0eb1e11)
+- **ui** Grouped lists match iOS 27: row heights, margins, corners and section spacing (79d5a59)
+- **logs** On desktop, Logs moves from the sidebar into Tools (46522eb)
+- **connections** Connections on macOS, Windows and Linux show the icon of the app that made them (888a1df)
+- **navigation** Requests sits right after Proxies in the desktop sidebar (f18f92e)
+- **connections** Connections that failed to connect now show in the requests list, with the reason (8736f48)
+- **update** When an update has no file to download, the app opens the release page to download it by hand (afe7136)
 
 **Bug Fixes**
 
-- **ui** Fix pasting and Chinese input in text fields (5769f7b)
-- **core** Large profiles no longer crash; downloads trust core CAs (c816c35)
+- **proxies** A rounder, larger delay test icon on proxy cards (0105a4f)
+- **prism_ui** Navigation bar tabs fit their titles, and a tap near a tab's edge selects it (4abbd15)
+- **dashboard** Live connections on the dashboard open on the active ones (8682368)
+- **rules** The rule type picker and rule lists show rule types as profiles write them, such as DOMAIN-KEYWORD, and rule search finds a rule by that name (9b01010)
+- **core** A stop whose answer is lost with the connection to the core no longer turns the proxy back on when the core comes back (06643c3)
+- **setup** Restarting the core with TUN on no longer hangs when it has to ask for authorization again (932826b)
+- **core** On desktop, a restart asked for while the core is still starting, such as after installing the helper, now restarts it, and the core can start again after a start whose local connection setup hung (f95f0f1)
+- **core** On Android, stopping while the core is still starting no longer leaves it running, and a start that failed while sending settings to the core no longer blocks the next start (7a63bb4)
+- **probes** Recheck watched service failures with backoff (fee1b89)
+- **probes** Service checks recover automatically when a chain switches to a working front proxy (1a57072)
+- **setup** Dashboard checks wait for startup to finish when you tap Start as the app opens (fac7b07)
+- **l10n** Shorter descriptions in network, DNS and general settings (18eaaea)
+- **segmented-control** Segmented controls follow the system's reduce motion setting (a47cac5)
+- **connected-button** Screen readers can now switch the dashboard's outbound mode (d45da9d)
+- **scaffold** On wider phones the top bar buttons line up with the list cards below them (21846fc)
+- **scaffold** Opening search puts the cursor in its field even when something else on the page has the focus (e3b13e7)
+- **android** App icons in access control and connections load from the cache instead of being redrawn every day (e3ebcf1)
+- **core** On macOS, connections show the app that opened them again (30817b4)
+- **window** A hidden window no longer takes the foreground from a full-screen game on Windows (6611671)
+- **linux** The Linux window is no longer drawn shifted toward the bottom left on NVIDIA and other drivers without glBlitFramebuffer (0ff56e5)
+- **tray** When the menu bar or tray icon cannot be shown, the log says why (746f7b0)
+- **macos** Intel Macs render with Skia again, fixing the hang at launch on older GPUs (0d3a33f)
+- **dashboard** Service checks show the address Claude and ChatGPT actually saw, not only the node's exit address (b16e2db)
+- **core** Gemini check no longer reports Hong Kong and Macau nodes as unsupported (80a86bc)
+- **core** macOS no longer collects defunct dscacheutil processes each time TUN is turned on or off (e7b017e)
+- **config** The default bypass list no longer skips the proxy for public 172.2* addresses, and the default fake-ip filter names Windows' real connectivity check hosts (80cc61b)
+- **ui** Pages open and close again after the display sleeps or changes (ce13953)
 
 **Performance**
 
-- **android** Smoother Android UI while the proxy is busy (a69413e)
+- **code_forge** Large files open in the editor without a pause (c5c7ef0)
+- **db** Profiles with many rules, groups or proxies open and update without stalling the screen (c8d1e9d)
+- **route** Pages that load their data open at once with a spinner instead of pausing before they slide in (b2267cb)
+- **android** Use less battery on Android in the background (7393ea4)
+- **ui** Open list editors and pages over others more smoothly (8eb40a9)
+- **dashboard** Smoother dashboard and tab switches, with one redraw a second while connected (edc6709)
+- **proxies** Smoother proxy pages when switching groups, sorting and scrolling (e21abb4)
+- **prism_ui** Swiping back on phones drops fewer frames (49df9ea)
 
-## v0.9.01 (2026-10-15)
+## v0.9.4 (2026-11-19)
 
 **Features**
 
-- **profiles** nowhere proxy type in the custom proxy form (66c9104)
+- **dashboard** One status button gathers core, update and resource states, with counts, download progress and new card icons (a89b339)
+- **rules** Added rules can go to named custom exits; a profile's script and added rules run together and open from the extend page (c8b34f2)
+- **proxy** PAC mode for the desktop system proxy; new Windows installs bypass <local>; GTK apps on KDE Plasma follow the proxy (7633c3c)
+- **dns** respect-rules, hosts and cache-algorithm in the DNS overrides; macOS system DNS through tun.dns-mode native (ca2693a)
+- **logs** Open a log on a phone to select and copy it (c85bf3a)
+- **resources** Geo resources update automatically by default (1b2ea11)
+- **desktop** Impeller on Windows and Intel Macs; the Apple Silicon download no longer carries Intel code (848583d)
+- Update the core to mihomo v1.19.34, with editor completion for its new keys (e57e5ac)
 
 **Bug Fixes**
 
-- Update repository references in release template and changelog tool (28a6599)
+- **core** A start that fails or a lost Core says why; a mixed port of 0 is replaced; the mixed port opens without a profile (8298573)
+- **config** Process rules match by default; picked override keys are written as set, empty included (044f5b5)
+- **android** WireGuard, Hysteria2 and TUIC reconnect after a network change; core sockets opened before the VPN are protected (b13cf52)
+- **dashboard** Service and exit IP checks no longer fail while the proxy starts, stops or changes network (408aaa9)
+- **core** HTTPUpgrade share links no longer import as WebSocket (47824d4)
+- **connections** App icons show whenever the app is known and keep their place while loading (5c5964f)
+- **desktop** macOS tray windows stay on the current Space; windows use the target display's scale; AppImage without a bundled libstdc++; cleaner deb removal; the Windows installer only stops its own processes (c620dc9)
+- **ui** Pages open at the top and on the selected profile; sheets open from sheets as pages; the editor shows its spinner and grows its sheet; calmer success and warning colors; remote icons hold their size (b08bcd9)
+
+**Performance**
+
+- **connections** Connections rank and sort off the UI thread; proxy and group icons use less memory (19fb1b0)
+
+## v0.9.3 (2026-11-04)
+
+**Features**
+
+- **connections** Merged requests and connections; quick edit lists (52b975f)
+- **ui** iOS 27 transitions, press and text selection; smoother pages (bb47f2c)
+- **update** Download and install updates in the app (b8f84b3)
+- **core** One delay test timeout; VPN crash and startup fixes (2a5a42c)
+
+**Bug Fixes**
+
+- **core** Auto-select leaves an unusable first node at once (7d5db7e)
+- **access** Keep selections a filter hides (63aaf6d)
+
+## v0.9.2 (2026-10-24)
+
+**Features**
+
+- **access** Access control state shown in a bar at the bottom (e8aac17)
+- **config** Optional general overrides; settings apply sooner (5d6552d)
+- **dashboard** IP quality cached for 3 days; simpler Android dashboard (8176cce)
+- Update the core to mihomo v1.19.33 (0817c3b)
+- **tray** Colored tray status icons; monochrome option on macOS (bbfafde)
+- **desktop** Sidebar blur; Windows fixes; keeps system proxies FlClash didn't set (6928521)
+- **profiles** Profile QR codes, phone-to-TV links, more proxy fields (eaaf3e3)
+- **proxies** Add proxies to local proxies; adjustable delay test timeout (0f9f89c)
+- **theme** Higher-contrast dark mode and a refreshed app icon (a4fc067)
+- **ui** iOS-style docked search and menus; bar buttons lift on hover (0d98a9d)
+- **ui** iOS-style switches, stretchy sheets, menus and long-press reordering (ae902ed)
+- **ui** Pages scroll under the Android navigation bar (4837fb3)
+- **core** Clear the DNS cache by hand or on network change (09e7e56)
+
+**Bug Fixes**
+
+- **android** Opening the app no longer reloads a running VPN (99b3381)
+
+**Performance**
+
+- **editor** Smoother editor for large files and in sheets (7035edd)
+
+## v0.9.1 (2026-10-17)
+
+**Breaking Changes**
+
+- **network** Desktop TUN keys follow the profile unless picked; changed values carry over (cb08088)
+
+**Features**
+
+- **l10n** French, Spanish and Korean translations (f43755c)
+- **android** No more Firebase analytics or crash reporting (bc72bba)
+- **network** Per-key desktop TUN settings; system proxy and tray fixes (cb08088)
+- **theme** Redesigned theme colors and color styles (5eafd7a)
+- **dashboard** A redesigned dashboard around the current exit (9bd258f)
+- **profiles** Profile-detail resources and include-all in custom groups (0bac500)
+- **proxies** Proxy groups as cards, group tabs as chips (2ea52fd)
+- **views** Sortable tables for connections, requests and DNS (da6fb0a)
+- **ui** Optional two-tier Liquid Glass and slide-to-pick menus (7c9627f)
+- **ui** iOS-style surfaces, alerts and sheets; clearer TV focus (9bd2286)
+
+**Bug Fixes**
+
+- **ui** Fix pasting and Chinese input in text fields (5607f70)
+- **core** Large profiles no longer crash; downloads trust core CAs (5984c16)
+
+**Performance**
+
+- **android** Smoother Android UI while the proxy is busy (2201c19)
 
 ## v0.9.0 (2026-10-14)
 

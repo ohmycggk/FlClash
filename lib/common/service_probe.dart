@@ -8,6 +8,9 @@ import 'package:flutter/foundation.dart';
 const directOutbound = 'DIRECT';
 const routedOutbound = '';
 
+/// `probeErrorTimeout` in core/probe.go.
+const probeErrorTimeout = 'timeout';
+
 /// [id] must match the checker name registered in core/service_check.go.
 enum ServiceTarget {
   google('google', 'Google', 'google'),
@@ -22,7 +25,7 @@ enum ServiceTarget {
   spotify('spotify', 'Spotify', 'spotify'),
   tiktok('tiktok', 'TikTok', 'tiktok'),
   discord('discord', 'Discord', 'discord'),
-  bilibili('bilibili', 'bilibili', 'bilibili');
+  bilibili('bilibili', 'Bilibili', 'bilibili');
 
   const ServiceTarget(this.id, this.label, this.icon);
 
@@ -75,9 +78,11 @@ class ServiceCheck {
     this.delay,
     this.chains = const [],
     this.region,
+    this.ip,
     this.checkedAt,
     this.coreEpoch = 0,
-    this.picksVersion = 0,
+    this.routeVersion = 0,
+    this.hits = const [],
   });
 
   factory ServiceCheck.of(ServiceCheckItem item) {
@@ -86,11 +91,13 @@ class ServiceCheck {
       delay: item.delay > 0 ? item.delay : null,
       chains: item.chains,
       region: item.region.isEmpty ? null : item.region,
+      ip: item.ip.isEmpty ? null : item.ip,
       checkedAt: item.checkedAt > 0
           ? DateTime.fromMillisecondsSinceEpoch(item.checkedAt)
           : null,
       coreEpoch: item.coreEpoch,
-      picksVersion: item.picksVersion,
+      routeVersion: item.routeVersion,
+      hits: item.hits,
     );
   }
 
@@ -98,9 +105,14 @@ class ServiceCheck {
   final int? delay;
   final List<String> chains;
   final String? region;
+
+  /// The address the service itself saw, which a node that routes the
+  /// service out another way does not share with its other traffic.
+  final String? ip;
   final DateTime? checkedAt;
   final int coreEpoch;
-  final int picksVersion;
+  final int routeVersion;
+  final List<RouteHit> hits;
 
   String? get node => chains.firstOrNull;
 
@@ -111,9 +123,11 @@ class ServiceCheck {
       other.delay == delay &&
       listEquals(other.chains, chains) &&
       other.region == region &&
+      other.ip == ip &&
       other.checkedAt == checkedAt &&
       other.coreEpoch == coreEpoch &&
-      other.picksVersion == picksVersion;
+      other.routeVersion == routeVersion &&
+      listEquals(other.hits, hits);
 
   @override
   int get hashCode => Object.hash(
@@ -121,14 +135,17 @@ class ServiceCheck {
     delay,
     Object.hashAll(chains),
     region,
+    ip,
     checkedAt,
     coreEpoch,
-    picksVersion,
+    routeVersion,
+    Object.hashAll(hits),
   );
 
   @override
   String toString() =>
-      'ServiceCheck(${status.id}, delay: $delay, node: $node, region: $region)';
+      'ServiceCheck(${status.id}, delay: $delay, node: $node, region: $region, '
+      'ip: $ip)';
 }
 
 /// An empty [proxyName] lets the Core route by its rules; an empty [targets]
@@ -161,7 +178,6 @@ final Map<String, IpInfo Function(String)> ipInfoSources = {
   'https://api.ip.sb/geoip': _json(IpInfo.fromIpSbJson),
   'https://ipinfo.io/json': _json(IpInfo.fromIpInfoIoJson),
   'https://ipwho.is': _json(IpInfo.fromIpWhoIsJson),
-  'http://ip-api.com/json': _json(IpInfo.fromIpAPIJson),
   'https://get.geojs.io/v1/ip/geo.json': _json(IpInfo.fromGeoJsJson),
   'https://api.country.is': _json(IpInfo.fromCountryIsJson),
   'https://api.ipquery.io/?format=json': _json(IpInfo.fromIpQueryJson),
@@ -169,7 +185,7 @@ final Map<String, IpInfo Function(String)> ipInfoSources = {
 };
 
 /// Raw so the route stamp survives; [parseOutboundIp] reads the address.
-Future<OutboundIpResult?> lookupOutboundIp(
+Future<OutboundIpResult> lookupOutboundIp(
   CoreController core,
   String proxyName, {
   Duration timeout = outboundIpTimeoutDuration,
@@ -183,8 +199,8 @@ Future<OutboundIpResult?> lookupOutboundIp(
   );
 }
 
-IpInfo? parseOutboundIp(OutboundIpResult? result) {
-  if (result == null || result.error != null || result.body.isEmpty) {
+IpInfo? parseOutboundIp(OutboundIpResult result) {
+  if (result.error != null || result.body.isEmpty) {
     return null;
   }
   final parse = ipInfoSources[result.url];

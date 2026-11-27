@@ -1,12 +1,12 @@
 package com.follow.clash
 
 import com.follow.clash.common.AccessControlMode
-import com.follow.clash.models.SetupParams
 import com.follow.clash.models.SharedState
 import com.follow.clash.service.models.AccessControlProps
 import com.follow.clash.service.models.NotificationParams
 import com.follow.clash.service.models.VpnOptions
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
@@ -38,7 +38,9 @@ private fun vpnOptions(enable: Boolean = true, stack: String = "gvisor") = VpnOp
 
 private fun configuredState(enable: Boolean = true, stack: String = "gvisor") = SharedState(
     vpnOptions = vpnOptions(enable, stack),
-    setupParams = SetupParams(testUrl = "https://example.com", selectedMap = emptyMap()),
+    setupParams = JsonParser.parseString(
+        """{"selected-map":{},"options":{"test-url":"https://example.com"}}""",
+    ).asJsonObject,
 )
 
 private const val STARTED_AT = 1_700_000_000_000L
@@ -108,10 +110,12 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
     val toasts = mutableListOf<String>()
     val logs = mutableListOf<String>()
     val notificationParams = mutableListOf<NotificationParams>()
+    val mitm = mutableListOf<Boolean>()
     var setupCalls = 0
     var startCalls = 0
     var stopCalls = 0
     var stoppedNotifications = 0
+    val stopFailures = mutableListOf<StartFailure?>()
     var lastInitParams: String? = null
     var lastSetupParams: String? = null
 
@@ -127,6 +131,10 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
         notificationParams += params
     }
 
+    override fun updateMitm(enabled: Boolean) {
+        mitm += enabled
+    }
+
     override fun loadSharedState(): SharedState = storedSharedState
 
     override fun isVpnPermissionGranted(): Boolean = vpnPermissionGranted
@@ -137,8 +145,9 @@ private class FakeHost(override val scope: CoroutineScope) : ServiceStateHost {
 
     override fun app(): AppGateway? = app
 
-    override fun notifyStopped() {
+    override fun notifyStopped(failure: StartFailure?) {
         stoppedNotifications++
+        stopFailures += failure
     }
 
     override suspend fun quickSetup(initParams: String, setupParams: String): Result<String> {
@@ -199,6 +208,17 @@ class ServiceStateMachineTest {
     }
 
     @Test
+    fun `a synced shared state hands the service its MITM switch`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+
+        machine.syncSharedState(configuredState().copy(mitm = true))
+        machine.syncSharedState(configuredState())
+
+        assertEquals(listOf(true, false), host.mitm)
+    }
+
+    @Test
     fun `the run time is reported only while a run is both requested and up`() = runTest {
         val host = FakeHost(backgroundScope)
         val machine = ServiceStateMachine(host)
@@ -249,7 +269,7 @@ class ServiceStateMachineTest {
         assertFalse(machine.requestStart().await())
         assertEquals(RunState.STOPPED, machine.runState.value)
         assertFalse(machine.isRunRequested)
-        assertEquals(1, host.stoppedNotifications)
+        assertEquals(listOf(StartFailure.SERVICE), host.stopFailures)
     }
 
     @Test
@@ -318,7 +338,7 @@ class ServiceStateMachineTest {
 
         assertFalse(machine.requestStart().await())
         assertEquals(0, host.startCalls)
-        assertEquals(1, host.stoppedNotifications)
+        assertEquals(listOf(StartFailure.VPN_PERMISSION), host.stopFailures)
     }
 
     /** Flutter opened the Core's listeners before asking, and may be gone before it hears back. */

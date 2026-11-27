@@ -35,17 +35,22 @@ ProxyState proxyState(Ref ref) {
       (state) => SystemProxySelectorState(
         systemProxy: state.systemProxy,
         bypassDomain: state.bypassDomain,
+        pacScript: state.pacMode ? state.pacScript : null,
       ),
     ),
   );
   final mixedPort = ref.watch(
     patchClashConfigProvider.select((state) => state.mixedPort),
   );
+  final moduleBypass = ref.watch(mitmModuleNetworkProvider).value?.bypassDomain;
   return ProxyState(
     isStart: suspend ? false : isStart,
     systemProxy: systemProxySelector.systemProxy,
-    bassDomain: systemProxySelector.bypassDomain,
+    bassDomain:
+        moduleBypass?.applyTo(systemProxySelector.bypassDomain) ??
+        systemProxySelector.bypassDomain,
     port: mixedPort,
+    pacScript: systemProxySelector.pacScript,
   );
 }
 
@@ -179,7 +184,9 @@ bool currentGroupDelayTesting(Ref ref) {
 
 @riverpod
 String realTestUrl(Ref ref, [String? testUrl]) {
-  final currentTestUrl = ref.watch(appSettingProvider).testUrl;
+  final currentTestUrl = ref.watch(
+    patchClashConfigProvider.select((state) => state.testUrl),
+  );
   return testUrl.takeFirstValid([currentTestUrl]);
 }
 

@@ -1,7 +1,6 @@
 import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/ui/color.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:prism_ui/color.dart';
 
 import 'app.dart';
 import 'clash_config.dart';
@@ -15,25 +14,6 @@ part 'generated/state.g.dart';
 @freezed
 abstract class SelectValue<T> with _$SelectValue<T> {
   const factory SelectValue(T value) = _SelectValue;
-}
-
-@freezed
-abstract class CommonMessage with _$CommonMessage {
-  const factory CommonMessage({
-    required String id,
-    required String text,
-    @Default(MessageLevel.info) MessageLevel level,
-    @Default(Duration(seconds: 3)) Duration duration,
-    MessageActionState? actionState,
-  }) = _CommonMessage;
-}
-
-@freezed
-abstract class MessageActionState with _$MessageActionState {
-  const factory MessageActionState({
-    required String actionText,
-    required VoidCallback action,
-  }) = _MessageActionState;
 }
 
 @freezed
@@ -57,6 +37,7 @@ abstract class TrayState with _$TrayState {
     required List<Group> groups,
     required Map<String, String> selectedMap,
     required bool showTrayTitle,
+    @Default(true) bool monochromeTrayIcon,
     required bool safeMode,
     @Default({}) Map<HotAction, HotKeyAction> hotKeys,
   }) = _TrayState;
@@ -132,6 +113,7 @@ abstract class ProxyState with _$ProxyState {
     required bool systemProxy,
     required List<String> bassDomain,
     required int port,
+    String? pacScript,
   }) = _ProxyState;
 }
 
@@ -150,6 +132,7 @@ abstract class SystemProxySelectorState with _$SystemProxySelectorState {
   const factory SystemProxySelectorState({
     required bool systemProxy,
     required List<String> bypassDomain,
+    String? pacScript,
   }) = _SystemProxySelectorState;
 }
 
@@ -180,7 +163,8 @@ abstract class SelectedProxyState with _$SelectedProxyState {
 @freezed
 abstract class SharedState with _$SharedState {
   const factory SharedState({
-    SetupParams? setupParams,
+    // Gson's JsonObject adapter rejects a JSON null, which would drop the sync.
+    @JsonKey(includeIfNull: false) SetupParams? setupParams,
     VpnOptions? vpnOptions,
     required String stopTip,
     required String startTip,
@@ -189,6 +173,7 @@ abstract class SharedState with _$SharedState {
     required String stopText,
     required bool onlyStatisticsProxy,
     @Default(true) bool showStopAction,
+    @Default(false) bool mitm,
   }) = _SharedState;
 
   factory SharedState.fromJson(Map<String, Object?> json) =>
@@ -219,10 +204,8 @@ abstract class MakeRealProfileState with _$MakeRealProfileState {
     required PatchClashConfig realPatchConfig,
     @Default(ProfileOverrides()) ProfileOverrides overrides,
     @Default(false) bool bypassPrivateRoute,
-
-    /// Set for a subscription, whose own DNS values an emptied entry replaces.
-    @Default(false) bool keepEmptyDnsOverrides,
     required bool appendSystemDns,
+    String? defaultTunDnsMode,
     required List<ProxyGroup> proxyGroups,
     required List<Rule> rules,
     required List<Rule> addedRules,
@@ -230,9 +213,24 @@ abstract class MakeRealProfileState with _$MakeRealProfileState {
     @Default([]) List<String> authentication,
     @Default({}) Map<String, dynamic> injectedProxyProviders,
     @Default({}) Map<String, dynamic> injectedRuleProviders,
-    String? matchTarget,
+    @Default({}) Map<String, String> exitTargets,
+
+    /// The profile's own outbounds when [rawConfig] does not carry them.
+    Set<String>? outboundNames,
+    String? defaultExitTarget,
     @Default(false) bool safeMode,
+    @Default([]) List<MitmModuleSource> mitmModules,
   }) = _MakeRealProfileState;
+}
+
+/// An enabled module as the profile build reads it.
+@freezed
+abstract class MitmModuleSource with _$MitmModuleSource {
+  const factory MitmModuleSource({
+    required String content,
+    @Default({}) Map<String, String> arguments,
+    @Default({}) Map<String, String> resources,
+  }) = _MitmModuleSource;
 }
 
 @freezed
@@ -247,6 +245,7 @@ abstract class MigrationData with _$MigrationData {
     @Default([]) List<ClashProvider> clashProviders,
     @Default([]) List<CustomProxy> customProxies,
     @Default([]) List<ProxyDialer> proxyDialers,
+    @Default([]) List<MitmModule> mitmModules,
   }) = _MigrationData;
 }
 
@@ -256,7 +255,6 @@ abstract class SetupState with _$SetupState {
     required int? profileId,
     required int? profileLastUpdateDate,
     required ProfileType profileType,
-    required ExtendType extendType,
     required List<Rule> rules,
     required List<ProxyGroup> proxyGroups,
     required List<Rule> addedRules,
@@ -266,6 +264,7 @@ abstract class SetupState with _$SetupState {
     @Default({}) Map<String, int> profileProviders,
     @Default([]) List<CustomProxy> appProxies,
     @Default({}) Map<int, String> proxyDialers,
-    String? matchTarget,
+    @Default({}) Map<String, String> exitTargets,
+    @Default([]) List<MitmModuleSource> mitmModules,
   }) = _SetupState;
 }

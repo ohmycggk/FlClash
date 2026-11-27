@@ -6,25 +6,27 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/metacubex/mihomo/common/convert"
+	nowhereTransport "github.com/metacubex/mihomo/transport/nowhere"
 )
 
 // Each link is written for convert.ConvertsV2Ray to read back, so the two
 // stay in step; a type with no link form, or a mapping whose server, plugin or
 // transport the converter cannot read back from a link, encodes to "".
-func handleEncodeShareLinks(mappings []map[string]any) []string {
-	links := make([]string, len(mappings))
-	for i, mapping := range mappings {
+func handleEncodeShareLinks(params ProxiesParams) []string {
+	links := make([]string, len(params.Proxies))
+	for i, mapping := range params.Proxies {
 		links[i] = encodeShareLink(proxyFields(mapping))
 	}
 	return links
 }
 
-func handleDecodeShareLinks(lines []string) [][]map[string]any {
-	results := make([][]map[string]any, len(lines))
-	for i, line := range lines {
+func handleDecodeShareLinks(params LinesParams) [][]map[string]any {
+	results := make([][]map[string]any, len(params.Lines))
+	for i, line := range params.Lines {
 		proxies, err := convert.ConvertsV2Ray([]byte(line))
 		if err != nil {
 			proxies = []map[string]any{}
@@ -130,6 +132,8 @@ func encodeShareLink(f proxyFields) string {
 		return encodeAnyTLS(f)
 	case "mieru":
 		return encodeMieru(f)
+	case "nowhere":
+		return encodeNowhere(f)
 	}
 	return ""
 }
@@ -184,9 +188,27 @@ func encodeShadowsocksR(f proxyFields) string {
 	return "ssr://" + encode(body)
 }
 
-func wsEarlyDataPath(path string, opts proxyFields) string {
+// mihomo reads a type=httpupgrade link back as ws with v2ray-http-upgrade.
+func shareNetwork(f proxyFields) string {
+	network := f.str("network")
+	if network == "ws" && f.sub("ws-opts").flag("v2ray-http-upgrade") {
+		return "httpupgrade"
+	}
+	return network
+}
+
+func wsEarlyDataPath(network string, opts proxyFields) string {
+	path := opts.str("path")
 	earlyData := opts.str("max-early-data")
-	if earlyData == "" || earlyData == "0" {
+	if network == "httpupgrade" {
+		earlyData = ""
+		if opts.flag("v2ray-http-upgrade-fast-open") {
+			earlyData = "0"
+		}
+	} else if earlyData == "0" {
+		earlyData = ""
+	}
+	if earlyData == "" {
 		return path
 	}
 	link, err := url.Parse(path)
@@ -226,15 +248,12 @@ func encodeVmess(f proxyFields) string {
 	if values["aid"] == "" {
 		values["aid"] = "0"
 	}
-	switch network := f.str("network"); network {
+	switch network := shareNetwork(f); network {
 	case "ws", "httpupgrade":
 		opts := f.sub("ws-opts")
 		values["net"] = network
 		values["host"] = opts.sub("headers").str("Host")
-		values["path"] = opts.str("path")
-		if network == "ws" {
-			values["path"] = wsEarlyDataPath(opts.str("path"), opts)
-		}
+		values["path"] = wsEarlyDataPath(network, opts)
 	case "http":
 		opts := f.sub("http-opts")
 		values["type"] = "http"
@@ -290,7 +309,7 @@ func vShareQuery(f proxyFields) url.Values {
 	case !f.flag("xudp"):
 		query.Set("packetEncoding", "none")
 	}
-	switch network := f.str("network"); network {
+	switch network := shareNetwork(f); network {
 	case "", "tcp":
 	case "http":
 		opts := f.sub("http-opts")
@@ -341,13 +360,14 @@ func encodeTrojan(f proxyFields) string {
 	}
 	setIf(query, "sni", f.str("sni"))
 	setIf(query, "alpn", strings.Join(f.list("alpn"), ","))
-	switch f.str("network") {
-	case "ws":
+	switch network := shareNetwork(f); network {
+	case "ws", "httpupgrade":
 		opts := f.sub("ws-opts")
-		if opts.sub("headers").str("Host") != "" {
+		if opts.sub("headers").str("Host") != "" ||
+			network == "httpupgrade" && opts.flag("v2ray-http-upgrade-fast-open") {
 			return ""
 		}
-		query.Set("type", "ws")
+		query.Set("type", network)
 		setIf(query, "path", opts.str("path"))
 	case "grpc":
 		query.Set("type", "grpc")
@@ -462,4 +482,61 @@ func encodeMieru(f proxyFields) string {
 	}
 	user := url.UserPassword(f.str("username"), f.str("password"))
 	return shareURL("mierus", user, host, query, f.str("name"))
+}
+
+func encodeNowhere(f proxyFields) string {
+	key := f.str("password")
+	if key == "" {
+		return ""
+	}
+	alpn := f.list("alpn")
+	up, down := f.str("up"), f.str("down")
+	isNW2 := slices.Contains(alpn, "nw2") || up != "" || down != ""
+	query := url.Values{}
+	if isNW2 {
+		if (up == "") != (down == "") {
+			return ""
+		}
+		setIf(query, "up", up)
+		setIf(query, "down", down)
+		setIf(query, "mux", f.str("mux"))
+		setIf(query, "pool", f.str("pool"))
+		query.Set("alpn", "nw2")
+		if _, hasMorph := f["morph"]; hasMorph {
+			if f.flag("morph") {
+				query.Set("morph", "1")
+			} else {
+				query.Set("morph", "0")
+			}
+		}
+		setIf(query, "sni", f.str("sni"))
+		if f.flag("skip-cert-verify") {
+			query.Set("insecure", "1")
+		}
+		setIf(query, "fp", f.str("client-fingerprint"))
+		setIf(query, "ech", f.sub("ech-opts").str("config"))
+		return shareURL("nowhere", url.User(key), hostPort(f), query, f.str("name"))
+	}
+	if err := nowhereTransport.ValidateNowhereServiceKey(key); err != nil {
+		return ""
+	}
+	setIf(query, "net", f.str("net"))
+	if _, hasMorph := f["morph"]; hasMorph {
+		if f.flag("morph") {
+			query.Set("morph", "1")
+		} else {
+			query.Set("morph", "0")
+		}
+	}
+	setIf(query, "grade", f.str("grade"))
+	setIf(query, "cipher", f.str("cipher"))
+	setIf(query, "sni", f.str("sni"))
+	setIf(query, "pin", f.str("pin"))
+	if f.flag("skip-cert-verify") {
+		query.Set("insecure", "1")
+	}
+	if slices.Contains(alpn, "nw3") {
+		query.Set("alpn", "nw3")
+	}
+	return shareURL("nowhere", url.User(key), hostPort(f), query, f.str("name"))
 }

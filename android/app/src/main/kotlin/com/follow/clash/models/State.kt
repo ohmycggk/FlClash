@@ -1,7 +1,7 @@
 package com.follow.clash.models
 
 import com.follow.clash.service.models.VpnOptions
-import com.google.gson.annotations.SerializedName
+import com.google.gson.JsonObject
 
 data class SharedState(
     val startTip: String = "Starting VPN...",
@@ -12,15 +12,8 @@ data class SharedState(
     val stopText: String = "Stop",
     val onlyStatisticsProxy: Boolean = false,
     val showStopAction: Boolean = true,
+    val mitm: Boolean = false,
     val vpnOptions: VpnOptions? = null,
-    val setupParams: SetupParams? = null,
-)
-
-data class SetupParams(
-    @SerializedName("test-url")
-    val testUrl: String,
-    @SerializedName("selected-map")
-    val selectedMap: Map<String, String>,
-    @SerializedName("skip-cert-verify")
-    val skipCertVerify: Boolean = false,
+    // The Core's own setup params, handed on as Flutter wrote them.
+    val setupParams: JsonObject? = null,
 )

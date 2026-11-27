@@ -29,15 +29,19 @@ _AppSettingProps _$AppSettingPropsFromJson(
   autoRun: json['autoRun'] as bool? ?? false,
   openLogs: json['openLogs'] as bool? ?? false,
   closeConnections: json['closeConnections'] as bool? ?? true,
-  testUrl: json['testUrl'] as String? ?? defaultTestUrl,
+  delayTestTimeout:
+      (json['delayTestTimeout'] as num?)?.toInt() ?? defaultDelayTestTimeout,
   tabAnimation:
       $enumDecodeNullable(
         _$TabAnimationEnumMap,
         _readTabAnimation(json, 'tabAnimation'),
       ) ??
-      TabAnimation.slide,
+      TabAnimation.fade,
   floatingNavigationBar: json['floatingNavigationBar'] as bool? ?? true,
   autoCheckUpdate: json['autoCheckUpdate'] as bool? ?? true,
+  updateChannel:
+      $enumDecodeNullable(_$UpdateChannelEnumMap, json['updateChannel']) ??
+      UpdateChannel.stable,
   sidebarExpanded:
       _readSidebarExpanded(json, 'sidebarExpanded') as bool? ?? true,
   acceptedDisclaimerVersion:
@@ -49,6 +53,7 @@ _AppSettingProps _$AppSettingPropsFromJson(
       $enumDecodeNullable(_$RestoreStrategyEnumMap, json['restoreStrategy']) ??
       RestoreStrategy.compatible,
   showTrayTitle: json['showTrayTitle'] as bool? ?? true,
+  monochromeTrayIcon: json['monochromeTrayIcon'] as bool? ?? true,
   checkCertificate: json['checkCertificate'] as bool? ?? true,
   userAgents:
       (_readUserAgents(json, 'userAgents') as List<dynamic>?)
@@ -100,10 +105,11 @@ Map<String, dynamic> _$AppSettingPropsToJson(_AppSettingProps instance) =>
       'autoRun': instance.autoRun,
       'openLogs': instance.openLogs,
       'closeConnections': instance.closeConnections,
-      'testUrl': instance.testUrl,
+      'delayTestTimeout': instance.delayTestTimeout,
       'tabAnimation': _$TabAnimationEnumMap[instance.tabAnimation]!,
       'floatingNavigationBar': instance.floatingNavigationBar,
       'autoCheckUpdate': instance.autoCheckUpdate,
+      'updateChannel': _$UpdateChannelEnumMap[instance.updateChannel]!,
       'sidebarExpanded': instance.sidebarExpanded,
       'acceptedDisclaimerVersion': instance.acceptedDisclaimerVersion,
       'minimizeOnExit': instance.minimizeOnExit,
@@ -111,6 +117,7 @@ Map<String, dynamic> _$AppSettingPropsToJson(_AppSettingProps instance) =>
       'developerMode': instance.developerMode,
       'restoreStrategy': _$RestoreStrategyEnumMap[instance.restoreStrategy]!,
       'showTrayTitle': instance.showTrayTitle,
+      'monochromeTrayIcon': instance.monochromeTrayIcon,
       'checkCertificate': instance.checkCertificate,
       'userAgents': instance.userAgents,
       'filters': instance.filters,
@@ -125,6 +132,11 @@ Map<String, dynamic> _$AppSettingPropsToJson(_AppSettingProps instance) =>
 const _$TabAnimationEnumMap = {
   TabAnimation.slide: 'slide',
   TabAnimation.fade: 'fade',
+};
+
+const _$UpdateChannelEnumMap = {
+  UpdateChannel.stable: 'stable',
+  UpdateChannel.pre: 'pre',
 };
 
 const _$RestoreStrategyEnumMap = {
@@ -259,8 +271,9 @@ _NetworkProps _$NetworkPropsFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           defaultBypassDomain,
+      pacMode: json['pacMode'] as bool? ?? false,
+      pacScript: json['pacScript'] as String? ?? defaultPacScript,
       bypassPrivateRoute: json['bypassPrivateRoute'] as bool? ?? true,
-      autoSetSystemDns: json['autoSetSystemDns'] as bool? ?? true,
       appendSystemDns: json['appendSystemDns'] as bool? ?? false,
       authentication: json['authentication'] == null
           ? defaultAuthenticationProps
@@ -273,8 +286,9 @@ Map<String, dynamic> _$NetworkPropsToJson(_NetworkProps instance) =>
     <String, dynamic>{
       'systemProxy': instance.systemProxy,
       'bypassDomain': instance.bypassDomain,
+      'pacMode': instance.pacMode,
+      'pacScript': instance.pacScript,
       'bypassPrivateRoute': instance.bypassPrivateRoute,
-      'autoSetSystemDns': instance.autoSetSystemDns,
       'appendSystemDns': instance.appendSystemDns,
       'authentication': instance.authentication,
     };
@@ -360,7 +374,7 @@ _ThemeProps _$ThemePropsFromJson(Map<String, dynamic> json) => _ThemeProps(
       ) ??
       ColorStyle.vivid,
   pureBlack: json['pureBlack'] as bool? ?? false,
-  sidebarBlur: json['sidebarBlur'] as bool? ?? true,
+  sidebarBlur: json['sidebarBlur'] as bool? ?? false,
   liquidGlass:
       $enumDecodeNullable(
         _$LiquidGlassModeEnumMap,

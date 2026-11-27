@@ -3,20 +3,18 @@ import 'dart:math';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/features/features.dart';
-import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/outbound_ip.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/routed_probe.dart';
 import 'package:fl_clash/providers/service_status.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
-import 'package:fl_clash/views/dashboard/probe_start_hold.dart';
 import 'package:fl_clash/views/dashboard/layout.dart';
 import 'package:fl_clash/views/dashboard/style.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:material_ui/material_ui.dart';
 
 import 'card.dart';
 
@@ -37,78 +35,51 @@ String _statusLabel(BuildContext context, ServiceProbeStatus status) {
   };
 }
 
-typedef _StatusColors = ({Color color, Color container, Color onContainer});
-
-_StatusColors _statusColors(BuildContext context, ServiceProbeStatus status) {
+Color _statusColor(BuildContext context, ServiceProbeStatus status) {
   final colorScheme = context.colorScheme;
   return switch (status) {
-    ServiceProbeStatus.available => (
-      color: colorScheme.success,
-      container: colorScheme.successContainer,
-      onContainer: colorScheme.onSuccessContainer,
-    ),
+    ServiceProbeStatus.available => colorScheme.success,
     ServiceProbeStatus.restricted ||
     ServiceProbeStatus.disallowedIsp ||
     ServiceProbeStatus.blocked ||
     ServiceProbeStatus.unsupportedRegion ||
     ServiceProbeStatus.originalsOnly ||
-    ServiceProbeStatus.comingSoon => (
-      color: colorScheme.warning,
-      container: colorScheme.warningContainer,
-      onContainer: colorScheme.onWarningContainer,
-    ),
+    ServiceProbeStatus.comingSoon => colorScheme.warning,
     ServiceProbeStatus.unavailable ||
     ServiceProbeStatus.timeout ||
-    ServiceProbeStatus.failed => (
-      color: colorScheme.error,
-      container: colorScheme.errorContainer,
-      onContainer: colorScheme.onErrorContainer,
-    ),
+    ServiceProbeStatus.failed => colorScheme.error,
   };
 }
 
-Color _statusColor(BuildContext context, ServiceProbeStatus status) =>
-    _statusColors(context, status).color;
-
-_StatusColors _idleColors(BuildContext context) => (
-  color: context.colorScheme.onSurfaceVariant,
-  container: context.raisedSurfaceLevel.colorOf(context.colorScheme),
-  onContainer: context.colorScheme.onSurfaceVariant,
-);
-
-(String, _StatusColors) _statusOf(
+(String, Color) _statusOf(
   BuildContext context,
   ServiceCheck? check,
   ProbePhase phase,
 ) {
   final localizations = context.appLocalizations;
+  final idle = context.colorScheme.onSurfaceVariant;
   if (phase == ProbePhase.probing) {
-    return (localizations.loading, _idleColors(context));
+    return (localizations.loading, idle);
   }
   if (check != null) {
     return (
       _statusLabel(context, check.status),
-      _statusColors(context, check.status),
+      _statusColor(context, check.status),
     );
   }
   if (phase == ProbePhase.failed) {
     return (
       _statusLabel(context, ServiceProbeStatus.failed),
-      _statusColors(context, ServiceProbeStatus.failed),
+      context.colorScheme.error,
     );
   }
-  return (localizations.servicePending, _idleColors(context));
+  return (localizations.servicePending, idle);
 }
 
-// The Core checks this many services at a time (serviceCheckConcurrency), so
-// a route change re-checks the whole card in one wave.
-const _shownServiceCount = 4;
-
-/// A service as the card shows it: a failure held through a start reads as
-/// still checking, without the result it replaced.
 class _ServiceView {
-  _ServiceView(this.target, ProbeEntry<ServiceCheck> entry, this.phase)
-    : check = phase == entry.phase ? entry.value : null;
+  _ServiceView(this.target, ProbeEntry<ServiceCheck> entry)
+    : phase = entry.phase,
+      check = entry.value;
 
   final ServiceTarget target;
   final ProbePhase phase;
@@ -132,9 +103,7 @@ class _ServiceView {
       _statusLabel(context, check.status),
       _statusColor(context, check.status),
     ),
-    null => switch (_statusOf(context, null, phase)) {
-      (final label, final colors) => (label, colors.color),
-    },
+    null => _statusOf(context, null, phase),
   };
 
   Color? dotOf(BuildContext context) => switch (check) {
@@ -145,17 +114,19 @@ class _ServiceView {
 }
 
 class ServiceStatusCard extends ConsumerStatefulWidget {
-  const ServiceStatusCard({super.key});
+  const ServiceStatusCard({super.key, this.columns = 2});
+
+  final int columns;
 
   @override
   ConsumerState<ServiceStatusCard> createState() => _ServiceStatusCardState();
 }
 
-class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
-    with ProbeStartHold<ServiceStatusCard> {
+class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard> {
   late final ServiceStatus _services;
   Set<ServiceTarget> _shown = const {};
   Set<ServiceTarget> _watched = const {};
+  int? _shownCount;
   var _syncScheduled = false;
 
   @override
@@ -172,14 +143,16 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     super.dispose();
   }
 
-  void _watchShown(Set<ServiceTarget> shown) {
-    if (setEquals(shown, _shown)) return;
+  void _syncShown(Set<ServiceTarget> shown, int count) {
+    if (setEquals(shown, _shown) && count == _shownCount) return;
     _shown = shown;
+    _shownCount = count;
     if (_syncScheduled) return;
     _syncScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncScheduled = false;
       if (!mounted) return;
+      ref.read(shownServiceCountProvider.notifier).value = _shownCount!;
       final shown = _shown;
       for (final target in shown.difference(_watched)) {
         _services.watch(target);
@@ -191,26 +164,22 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     });
   }
 
-  Future<void> _openSheet() => showServiceStatusSheet(context);
-
   @override
   Widget build(BuildContext context) {
     final density = DashboardDensityScope.of(context);
     final mobile = !density.isDesktop;
     final appLocalizations = context.appLocalizations;
+    // At most four: what the Core checks at once (serviceCheckConcurrency).
+    final shownCount = (mobile ? 1 : 2) * widget.columns;
+    final stacked = widget.columns == 1;
     final shown = ref
         .watch(enabledServiceTargetsProvider)
-        .take(_shownServiceCount)
+        .take(shownCount)
         .toList();
-    _watchShown(shown.toSet());
+    _syncShown(shown.toSet(), shownCount);
     final state = ref.watch(serviceStatusProvider);
     final services = [
-      for (final target in shown)
-        _ServiceView(
-          target,
-          state.entryOf(target),
-          shownPhase(state.entryOf(target)),
-        ),
+      for (final target in shown) _ServiceView(target, state.entryOf(target)),
     ];
     final problems = services.where((service) => service.abnormal).length;
     final verdict = problems > 0
@@ -224,13 +193,15 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
             tone: DashboardChipTone.ok,
           )
         : null;
+    Future<void> openSheet() => showServiceStatusSheet(context);
     final scale = DashboardDensityScope.scaleOf(context);
     final grid = _ServiceGrid(
       services: services,
+      columns: widget.columns,
       fill: !mobile,
       cellHeight:
           (mobile
-              ? 50
+              ? 44
               : density.isCompact
               ? 40
               : 46) *
@@ -239,31 +210,32 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
     );
     return DashboardCard(
       semanticLabel: appLocalizations.serviceStatus,
-      onTap: mobile ? _openSheet : null,
+      onTap: mobile ? openSheet : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: mobile ? MainAxisSize.min : MainAxisSize.max,
         children: [
           DashboardCardHeader(
-            glyph: AppGlyphs.verified,
+            glyph: AppGlyphs.radar,
             title: appLocalizations.serviceStatus,
             chevron: mobile,
             trailing: [
-              ?verdict,
+              if (!stacked) ?verdict,
               if (!mobile)
                 Transform.translate(
                   offset: const Offset(8, 0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _CheckAllButton(
-                        loading: shown.any(state.isLoading),
-                        onPressed: () => _services.refresh(shown),
-                      ),
+                      if (!stacked)
+                        _CheckAllButton(
+                          loading: shown.any(state.isLoading),
+                          onPressed: () => _services.refresh(shown),
+                        ),
                       DashboardIconButton(
                         glyph: AppGlyphs.chevronForward,
                         tooltip: appLocalizations.serviceStatus,
-                        onPressed: _openSheet,
+                        onPressed: openSheet,
                       ),
                     ],
                   ),
@@ -281,24 +253,23 @@ class _ServiceStatusCardState extends ConsumerState<ServiceStatusCard>
 class _ServiceGrid extends StatelessWidget {
   const _ServiceGrid({
     required this.services,
+    required this.columns,
     required this.fill,
     required this.cellHeight,
     required this.gap,
   });
 
-  static const _columns = 2;
-
   final List<_ServiceView> services;
+  final int columns;
 
-  /// Keeps the two rows four services take on a card of fixed height, the
-  /// cells of a single row growing into tiles.
+  /// Holds two rows on a fixed-height card, a single row growing into tiles.
   final bool fill;
   final double cellHeight;
   final double gap;
 
   @override
   Widget build(BuildContext context) {
-    if (fill && services.length <= _columns) {
+    if (fill && services.length <= columns) {
       return SizedBox(
         height: cellHeight * 2 + gap,
         child: Row(
@@ -321,11 +292,11 @@ class _ServiceGrid extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       spacing: gap,
       children: [
-        for (var start = 0; start < services.length; start += _columns)
+        for (var start = 0; start < services.length; start += columns)
           Row(
             spacing: gap,
             children: [
-              for (final service in services.skip(start).take(_columns))
+              for (final service in services.skip(start).take(columns))
                 Expanded(
                   child: _ServiceCell(service: service, height: cellHeight),
                 ),
@@ -369,59 +340,55 @@ class _ServiceCell extends StatelessWidget {
       dot: service.dotOf(context),
     );
     final text = ExcludeSemantics(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            service.target.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyle.footnote.of(context, emphasized: true),
-          ),
-          if (service.loading)
-            SkeletonText(width: 44, style: status)
-          else
-            Text(
+      child: service.loading
+          ? SkeletonText(width: 44, style: status)
+          : Text(
               label,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: status,
             ),
-        ],
-      ),
     );
     return Semantics(
       label: service.target.label,
       value: label,
       liveRegion: true,
-      child: tile
-          ? DashboardBlock(
-              radius: DashboardCorner.tab,
-              padding: const EdgeInsets.all(_inset),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  badge,
-                  Padding(padding: _tileText, child: text),
-                ],
-              ),
-            )
-          : SizedBox(
-              height: height,
-              child: DashboardBlock(
+      child: Tooltip(
+        message: '${service.target.label}\n$label',
+        excludeFromSemantics: true,
+        child: tile
+            ? DashboardBlock(
                 radius: DashboardCorner.tab,
-                padding: const EdgeInsetsDirectional.fromSTEB(_inset, 0, 12, 0),
-                child: Row(
-                  spacing: 8,
+                padding: const EdgeInsets.all(_inset),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     badge,
-                    Expanded(child: text),
+                    Padding(padding: _tileText, child: text),
                   ],
                 ),
+              )
+            : SizedBox(
+                height: height,
+                child: DashboardBlock(
+                  radius: DashboardCorner.tab,
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    _inset,
+                    0,
+                    12,
+                    0,
+                  ),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      badge,
+                      Expanded(child: text),
+                    ],
+                  ),
+                ),
               ),
-            ),
+      ),
     );
   }
 }
@@ -437,7 +404,7 @@ class _CheckAllButton extends StatelessWidget {
     if (loading) {
       return const SizedBox.square(
         dimension: 32,
-        child: Center(child: CommonCircleLoading(size: 18)),
+        child: Center(child: ActivityIndicator(size: 18)),
       );
     }
     return DashboardIconButton(
@@ -473,78 +440,19 @@ mixin _NodeAddressWatch<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   }
 }
 
-class _ServiceTitle extends StatelessWidget {
-  const _ServiceTitle({required this.name, required this.status});
-
-  static const _statusShare = 0.6;
-
-  final String name;
-  final Widget status;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      // A Flexible status would cap the name at its own share even when the
-      // status is short, so the status takes what it needs up to a limit.
-      builder: (context, constraints) => Row(
-        spacing: 8,
-        children: [
-          Flexible(
-            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: constraints.maxWidth * _statusShare,
-            ),
-            child: status,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label, required this.colors});
-
-  final String label;
-  final _StatusColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: ShapeDecoration(
-        color: colors.container,
-        shape: AppShape.full,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyle.caption1
-              .of(context, emphasized: true)
-              .copyWith(color: colors.onContainer),
-        ),
-      ),
-    );
-  }
-}
-
 /// Node names tend to carry their own flag emoji, so a service shows where
 /// its traffic leaves from as a flag and the address instead, and falls
 /// back to the node only when the address could not be looked up.
 class _OutboundIpLine extends StatelessWidget {
   const _OutboundIpLine({
-    required this.ip,
+    required this.address,
     required this.region,
     required this.pending,
     required this.fallback,
     required this.style,
   });
 
-  final IpInfo? ip;
+  final String? address;
   final String? region;
   final bool pending;
   final String? fallback;
@@ -552,10 +460,10 @@ class _OutboundIpLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ip = this.ip;
+    final address = this.address;
     final fallback = this.fallback;
-    final flag = ip?.countryCode ?? region;
-    if (flag == null && ip == null && !pending && fallback == null) {
+    final flag = region;
+    if (flag == null && address == null && !pending && fallback == null) {
       return _NoValue(style: style);
     }
     final line = Row(
@@ -566,9 +474,9 @@ class _OutboundIpLine extends StatelessWidget {
             flag.countryFlagEmoji,
             style: style?.copyWith(fontFamily: FontFamily.twEmoji.value),
           ),
-        if (ip != null)
+        if (address != null)
           Flexible(
-            child: IpQualityText(ip: ip.ip, style: style),
+            child: IpQualityText(ip: address, style: style),
           )
         else if (pending)
           Flexible(child: SkeletonText(width: 88, style: style))
@@ -583,15 +491,13 @@ class _OutboundIpLine extends StatelessWidget {
           ),
       ],
     );
-    if (ip == null) return line;
+    if (address == null) return line;
     return Tooltip(
       message: context.appLocalizations.outboundIp,
-      child: InkWell(
-        onTap: () => showIpQualitySheet(context, ip: ip.ip),
-        customBorder: AppShape.xs,
-        hoverColor: Colors.transparent,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
+      child: PressRegion(
+        onTap: () => showIpQualitySheet(context, ip: address),
+        shape: AppShape.xs,
+        overlay: PressRegion.focusOverlay,
         child: line,
       ),
     );
@@ -723,11 +629,9 @@ class _BadgePainter extends CustomPainter {
 }
 
 Future<void> showServiceStatusSheet(BuildContext context) {
-  return showSheet<void>(
-    context: context,
-    props: nestedPagedSheetProps,
-    builder: (_) =>
-        NestedPagedSheet(builder: (_) => const ServiceStatusSheet()),
+  return showNestedSheet<void>(
+    context,
+    builder: (_) => const ServiceStatusSheet(),
   );
 }
 
@@ -741,7 +645,7 @@ class ServiceStatusSheet extends ConsumerWidget {
     final state = ref.watch(serviceStatusProvider);
     final services = ref.read(serviceStatusProvider.notifier);
     final localizations = context.appLocalizations;
-    return CommonScaffold(
+    return Scaffold(
       title: localizations.serviceStatus,
       iconActions: [
         IconButtonData(
@@ -765,8 +669,8 @@ class ServiceStatusSheet extends ConsumerWidget {
             child: SizedBox(height: context.contentTopPadding),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            sliver: SliverList.builder(
+            padding: context.listInsets.page(bottom: 16 + context.bottomInset),
+            sliver: SliverPrismList(
               itemCount: targets.length,
               itemBuilder: (context, index) {
                 final target = targets[index];
@@ -819,7 +723,7 @@ class ServiceManageView extends ConsumerWidget {
       });
     }
 
-    final shown = enabled.take(_shownServiceCount).toSet();
+    final shown = enabled.take(ref.watch(shownServiceCountProvider)).toSet();
 
     Widget itemAt(int index) {
       final target = targets[index];
@@ -836,7 +740,7 @@ class ServiceManageView extends ConsumerWidget {
       );
     }
 
-    return CommonScaffold(
+    return Scaffold(
       title: context.appLocalizations.serviceManage,
       body: CustomScrollView(
         shrinkWrap: true,
@@ -844,14 +748,14 @@ class ServiceManageView extends ConsumerWidget {
           SliverToBoxAdapter(
             child: SizedBox(height: context.contentTopPadding),
           ),
-          SliverReorderableList(
+          SliverPrismReorderableList(
             itemBuilder: (_, index) => itemAt(index),
             itemCount: targets.length,
             proxyDecorator: (child, index, animation) =>
                 commonProxyDecorator(itemAt(index), index, animation),
             onReorderItem: reorder,
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          SliverToBoxAdapter(child: SizedBox(height: 16 + context.bottomInset)),
         ],
       ),
     );
@@ -859,9 +763,10 @@ class ServiceManageView extends ConsumerWidget {
 }
 
 const _rowBadgeSize = 40.0;
+const _rowStatusShare = 0.5;
 const _rowBadgeInset = 12.0;
 // Concentric with the corners DecorationListItem gives the ends of a run.
-const _rowBadgeRadius = AppCorner.xl - _rowBadgeInset;
+const _rowBadgeRadius = AppCorner.listGroup - _rowBadgeInset;
 
 class _ServiceManageItem extends StatelessWidget {
   const _ServiceManageItem({
@@ -884,17 +789,18 @@ class _ServiceManageItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onChanged = this.onChanged;
-    return ReorderableDelayedDragStartListener(
+    return ReorderDragStartListener(
       index: index,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: context.listInsets.page(),
         child: ItemPositionProvider(
           position: position,
           child: DecorationListItem(
             minVerticalPadding: _rowBadgeInset,
-            contentPadding: const EdgeInsets.only(
-              left: _rowBadgeInset,
-              right: 16,
+            minHeight: _rowBadgeSize + 2 * _rowBadgeInset,
+            contentPadding: EdgeInsetsDirectional.only(
+              start: _rowBadgeInset,
+              end: context.listInsets.trailing - Switch.edgeInset,
             ),
             onPressed: onChanged == null ? null : () => onChanged(!enabled),
             leading: _ServiceBadge(
@@ -939,7 +845,6 @@ class _ServiceRowState extends ConsumerState<_ServiceRow>
     with _NodeAddressWatch<_ServiceRow> {
   @override
   Widget build(BuildContext context) {
-    final localizations = context.appLocalizations;
     final secondary = AppTextStyle.footnote
         .of(context)
         .copyWith(color: context.colorScheme.onSurfaceVariant);
@@ -947,104 +852,85 @@ class _ServiceRowState extends ConsumerState<_ServiceRow>
     final entry = widget.entry;
     final check = entry.value;
     final loading = entry.isLoading;
+    final serviceIp = check?.ip;
     final node = check?.node;
-    _showNode(node);
-    final ipEntry = node != null
+    _showNode(serviceIp == null ? node : null);
+    final ipEntry = serviceIp == null && node != null
         ? ref.watch(
             outboundIpProbeProvider.select((state) => state.entryOf(node)),
           )
         : null;
     final outboundIp = ipEntry?.value;
-    final (label, colors) = _statusOf(context, check, entry.phase);
-    return DecorationListItem(
-      minVerticalPadding: _rowBadgeInset,
-      contentPadding: const EdgeInsets.only(left: _rowBadgeInset, right: 4),
-      onPressed: loading ? null : widget.onCheck,
-      leading: _ServiceBadge(
-        target: target,
-        size: _rowBadgeSize,
-        radius: _rowBadgeRadius,
-        dot: loading
-            ? context.colorScheme.onSurfaceVariant
-            : check != null || entry.phase == ProbePhase.failed
-            ? colors.color
-            : null,
-      ),
-      title: _ServiceTitle(
-        name: target.label,
-        status: _StatusPill(label: label, colors: colors),
-      ),
-      // A one-line tile is shorter than a two-line one, so the line is always
-      // there and a check does not resize the row.
-      subtitle: loading
-          ? SkeletonText(width: 96, style: secondary)
-          : _OutboundIpLine(
-              ip: outboundIp,
-              region: check?.region,
-              pending:
-                  ipEntry != null &&
-                  ipEntry.phase != ProbePhase.failed &&
-                  outboundIp == null,
-              fallback: node,
-              style: secondary,
-            ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 4,
-        children: [
-          _ServiceRowTrailing(check: check, style: secondary),
-          IconButton(
-            tooltip: localizations.serviceCheck,
-            onPressed: loading ? null : widget.onCheck,
-            icon: const GlyphIcon(AppGlyphs.refresh),
+    final service = _ServiceView(target, entry);
+    return LayoutBuilder(
+      builder: (context, constraints) => DecorationListItem(
+        minVerticalPadding: _rowBadgeInset,
+        minHeight: _rowBadgeSize + 2 * _rowBadgeInset,
+        contentPadding: EdgeInsetsDirectional.only(
+          start: _rowBadgeInset,
+          end: context.listInsets.trailing,
+        ),
+        onPressed: loading ? null : widget.onCheck,
+        leading: _ServiceBadge(
+          target: target,
+          size: _rowBadgeSize,
+          radius: _rowBadgeRadius,
+          dot: loading
+              ? context.colorScheme.onSurfaceVariant
+              : service.dotOf(context),
+        ),
+        title: Text(target.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        // A one-line tile is shorter than a two-line one, so the line is always
+        // there and a check does not resize the row.
+        subtitle: loading
+            ? SkeletonText(width: 96, style: secondary)
+            : _OutboundIpLine(
+                address: serviceIp ?? outboundIp?.ip,
+                region: serviceIp != null
+                    ? check?.region
+                    : outboundIp?.countryCode ?? check?.region,
+                pending:
+                    ipEntry != null &&
+                    ipEntry.phase != ProbePhase.failed &&
+                    outboundIp == null,
+                fallback: node,
+                style: secondary,
+              ),
+        trailing: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: constraints.maxWidth * _rowStatusShare,
           ),
-        ],
+          child: _ServiceRowStatus(service: service, loading: loading),
+        ),
       ),
     );
   }
 }
 
-class _ServiceRowTrailing extends StatelessWidget {
-  const _ServiceRowTrailing({required this.check, this.style});
+class _ServiceRowStatus extends StatelessWidget {
+  const _ServiceRowStatus({required this.service, required this.loading});
 
-  final ServiceCheck? check;
-  final TextStyle? style;
+  final _ServiceView service;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    final delay = check?.delay;
-    final checkedAt = check?.checkedAt;
-    if (delay == null && checkedAt == null) {
-      return const SizedBox.shrink();
+    final (label, color) = service.statusOf(context);
+    final style = AppTextStyle.footnote
+        .of(context, emphasized: true)
+        .toTabular
+        .copyWith(color: color);
+    if (loading) {
+      return SkeletonText(width: 44, style: style);
     }
-    final numeric = style?.copyWith(
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    final column = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (delay != null)
-          Text(
-            '$delay ms',
-            style: AppTextStyle.footnote
-                .of(context, emphasized: true)
-                .toTabular
-                .copyWith(color: context.colorScheme.onSurface),
-          ),
-        if (checkedAt != null)
-          Text(
-            checkedAt.showTime.trim(),
-            style: numeric?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-            ),
-          ),
-      ],
-    );
-    if (checkedAt == null) return column;
-    return Tooltip(
-      message: context.appLocalizations.serviceCheckedAt(checkedAt.showFull),
-      child: column,
+    return TooltipText(
+      text: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.end,
+        style: style,
+      ),
     );
   }
 }

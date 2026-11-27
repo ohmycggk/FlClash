@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:fl_clash/common/proxy.dart';
 import 'package:fl_clash/models/models.dart' show ProxyState;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:proxy/proxy.dart';
 
-class _FakeProxy implements Proxy {
+class _FakeProxy implements SystemProxy {
   final List<String> calls = [];
   Future<bool>? held;
   Error? failure;
@@ -23,12 +22,12 @@ class _FakeProxy implements Proxy {
   }
 
   @override
-  Future<bool> startProxy(int port, [List<String> bypassDomain = const []]) {
+  Future<bool> start(int port, List<String> bypassDomain, String? pacScript) {
     return _call('start $port');
   }
 
   @override
-  Future<bool> stopProxy() => _call('stop');
+  Future<bool> stop() => _call('stop');
 }
 
 ProxyState _state({required bool isStart}) {
@@ -57,18 +56,18 @@ void main() {
     final inFlight = Completer<bool>();
     proxy.held = inFlight.future;
 
-    unawaited(queue.apply(_state(isStart: false)));
+    unawaited(queue.apply(_state(isStart: true)));
     await pumpEventQueue();
     unawaited(queue.apply(_state(isStart: true)));
     final closed = queue.close();
     await pumpEventQueue();
-    expect(proxy.calls, ['stop']);
+    expect(proxy.calls, ['start 7890']);
 
     inFlight.complete(true);
     await closed;
     await queue.apply(_state(isStart: true));
 
-    expect(proxy.calls, ['stop', 'stop']);
+    expect(proxy.calls, ['start 7890', 'stop']);
   });
 
   test('a failing call does not stall the queue', () async {
@@ -80,5 +79,28 @@ void main() {
     await queue.apply(_state(isStart: false));
 
     expect(proxy.calls, ['start 7890', 'stop']);
+  });
+
+  test('leaves a proxy it never set alone', () async {
+    final proxy = _FakeProxy();
+    final queue = SystemProxyQueue(proxy);
+
+    await queue.apply(_state(isStart: false));
+    await queue.close();
+
+    expect(proxy.calls, isEmpty);
+  });
+
+  test('tries a failed stop again on close', () async {
+    final proxy = _FakeProxy();
+    final queue = SystemProxyQueue(proxy);
+
+    await queue.apply(_state(isStart: true));
+    proxy.held = Future.value(false);
+    await queue.apply(_state(isStart: false));
+    await queue.close();
+    await queue.close();
+
+    expect(proxy.calls, ['start 7890', 'stop', 'stop']);
   });
 }

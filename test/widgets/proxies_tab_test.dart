@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -11,13 +13,15 @@ import 'package:fl_clash/views/proxies/card.dart';
 import 'package:fl_clash/views/proxies/group_tabs.dart';
 import 'package:fl_clash/views/proxies/proxies.dart';
 import 'package:fl_clash/views/proxies/tab.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/glyph_finders.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
+import '../helpers/host_scaffold.dart';
 
 final _tabStateProvider = NotifierProvider<_TabStateNotifier, ProxiesTabState>(
   _TabStateNotifier.new,
@@ -69,7 +73,7 @@ void main() {
         container: globalContainer,
         child: TestApp(
           child: ProxiesTabView(key: key),
-          homeBuilder: (child) => Scaffold(body: child),
+          homeBuilder: (child) => HostScaffold(body: child),
         ),
       ),
     );
@@ -198,7 +202,7 @@ void main() {
     await tester.tap(find.byGlyph(AppGlyphs.chevronDown));
     await tester.pumpAndSettle();
 
-    final menu = find.byType(CommonPopupMenu);
+    final menu = find.byType(PopupMenu);
     final check = find.descendant(
       of: menu,
       matching: find.byGlyph(AppGlyphs.check),
@@ -288,6 +292,101 @@ void main() {
     expect(tester.getRect(find.byType(ProxyCard).first).top, grid.top);
   });
 
+  testWidgets('a long press on a card offers to select it and to add it to '
+      'the local proxies, one from a provider too', (tester) async {
+    const group = Group(
+      type: GroupType.Selector,
+      name: 'B',
+      all: [
+        Proxy(name: 'B-0', type: 'ss'),
+        Proxy(name: 'B-1', type: 'ss', providerName: 'sub'),
+      ],
+    );
+    globalContainer.read(groupsProvider.notifier).value = [group];
+    final profile = globalContainer.read(currentProfileProvider)!;
+    globalContainer
+        .read(profilesProvider.notifier)
+        .put(profile.copyWith(selectedMap: {'B': 'B-0'}));
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(_tabState([_group('A'), group]));
+    await pumpTabView(tester);
+    await tester.pumpAndSettle();
+    final menu = find.byType(PopupMenu);
+
+    await tester.longPress(find.text('B-0', findRichText: true));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: menu, matching: find.text('Select')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: menu, matching: find.byGlyph(AppGlyphs.check)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: menu, matching: find.text('Add to local proxies')),
+      findsOneWidget,
+    );
+
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('B-1', findRichText: true));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: menu, matching: find.text('Select')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: menu, matching: find.text('Add to local proxies')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a custom profile offers to add only the proxies of a provider, '
+      'as its own are the local proxies', (tester) async {
+    const group = Group(
+      type: GroupType.Selector,
+      name: 'B',
+      all: [
+        Proxy(name: 'B-0', type: 'ss'),
+        Proxy(name: 'B-1', type: 'ss', providerName: 'sub'),
+      ],
+    );
+    globalContainer.read(groupsProvider.notifier).value = [group];
+    final profile = globalContainer.read(currentProfileProvider)!;
+    globalContainer
+        .read(profilesProvider.notifier)
+        .put(profile.copyWith(type: ProfileType.custom));
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(_tabState([_group('A'), group]));
+    await pumpTabView(tester);
+    await tester.pumpAndSettle();
+    final menu = find.byType(PopupMenu);
+
+    await tester.longPress(find.text('B-0', findRichText: true));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: menu, matching: find.text('Select')),
+      findsOneWidget,
+    );
+    expect(find.text('Add to local proxies'), findsNothing);
+
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('B-1', findRichText: true));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: menu, matching: find.text('Add to local proxies')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a new current group leaves the visible cards as they were', (
     tester,
   ) async {
@@ -310,7 +409,119 @@ void main() {
     expect(tester.widget(card), same(before));
   });
 
-  testWidgets('lays each tab out at the width its label takes', (tester) async {
+  testWidgets('groups arriving again rebuild only the cards whose proxy '
+      'changed', (tester) async {
+    Group group(String changed) => Group(
+      type: GroupType.Selector,
+      name: 'B',
+      all: [
+        for (var i = 0; i < 4; i++)
+          Proxy(name: 'B-$i', type: i == 2 ? changed : 'ss'),
+      ],
+    );
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(_tabState([_group('A'), group('ss')]));
+    await pumpTabView(tester);
+    final before = tester.widgetList(find.byType(ProxyCard)).toList();
+
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(_tabState([_group('A'), group('trojan')]));
+    await tester.pump();
+
+    final after = tester.widgetList(find.byType(ProxyCard)).toList();
+    expect(
+      [for (var i = 0; i < 4; i++) identical(after[i], before[i])],
+      [true, true, false, true],
+    );
+  });
+
+  testWidgets('groups arriving in a new order move the cards already built', (
+    tester,
+  ) async {
+    Group group(List<int> order) => Group(
+      type: GroupType.Selector,
+      name: 'B',
+      all: [for (final i in order) Proxy(name: 'B-$i', type: 'ss')],
+    );
+    ProxyCard card(String name) => tester.widget(
+      find.byWidgetPredicate(
+        (widget) => widget is ProxyCard && widget.proxy.name == name,
+      ),
+    );
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(
+          _tabState([
+            _group('A'),
+            group([0, 1, 2, 3]),
+          ]),
+        );
+    await pumpTabView(tester);
+    final before = [for (var i = 0; i < 4; i++) card('B-$i')];
+
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(
+          _tabState([
+            _group('A'),
+            group([2, 0, 3, 1]),
+          ]),
+        );
+    await tester.pump();
+
+    expect([for (var i = 0; i < 4; i++) card('B-$i')], before);
+    final moved = tester.getTopLeft(find.text('B-2'));
+    final last = tester.getTopLeft(find.text('B-1'));
+    expect(
+      moved.dy < last.dy || (moved.dy == last.dy && moved.dx < last.dx),
+      isTrue,
+    );
+  });
+
+  testWidgets('a page swiped into view builds the cards in view, and the rows '
+      'ahead once the swipe rests', (tester) async {
+    Group long(String name) => Group(
+      type: GroupType.Selector,
+      name: name,
+      all: [for (var i = 0; i < 80; i++) Proxy(name: '$name-$i', type: 'ss')],
+    );
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(_tabState([long('A'), long('B')]));
+    await pumpTabView(tester);
+    await tester.pumpAndSettle();
+    final incoming = find.byWidgetPredicate(
+      (widget) => widget is ProxyCard && widget.groupName == 'A',
+      skipOffstage: false,
+    );
+    expect(incoming, findsNothing);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(TabBarView)),
+    );
+    await gesture.moveBy(const Offset(40, 0));
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    final viewBottom = tester.getRect(find.byType(TabBarView)).bottom;
+    final inView = tester.widgetList(incoming).length;
+    expect(inView, greaterThan(0));
+    for (final card in tester.elementList(incoming)) {
+      expect(
+        tester.getRect(find.byWidget(card.widget)).top,
+        lessThan(viewBottom),
+      );
+    }
+
+    await gesture.moveBy(const Offset(500, 0));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.widgetList(incoming).length, greaterThan(inView));
+  });
+
+  testWidgets('lays each tab out at the width its label takes, up to the '
+      'more menu\'s', (tester) async {
     const names = ['A', '🚀 节点选择', 'Group with a long name'];
     globalContainer
         .read(_tabStateProvider.notifier)
@@ -322,14 +533,89 @@ void main() {
       expect(
         tester.getSize(tab).width,
         closeTo(
-          tester
-              .renderObject<RenderBox>(tab)
-              .getMaxIntrinsicWidth(double.infinity),
+          min(
+            tester
+                .renderObject<RenderBox>(tab)
+                .getMaxIntrinsicWidth(double.infinity),
+            PopupMenu.labelMaxWidth + 32,
+          ),
           1,
         ),
         reason: name,
       );
     }
+  });
+
+  testWidgets('a long group name stops at the more menu\'s label width, and '
+      'the strip centers its tab by that width', (tester) async {
+    const long =
+        '🇭🇰 香港 Hong Kong 自动选择 low latency relay nodes for streaming '
+        'and gaming over IPLC premium line 01';
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(
+          _tabState([
+            for (var i = 0; i < 12; i++) _group(i == 6 ? long : 'Group $i'),
+          ], current: long),
+        );
+    await pumpTabView(tester);
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    final label = find.text(long, findRichText: true);
+    final text = tester.renderObject<RenderParagraph>(label);
+    expect(text.didExceedMaxLines, isTrue);
+    expect(
+      tester.getSize(label).width,
+      lessThanOrEqualTo(PopupMenu.labelMaxWidth),
+    );
+    final tab = tester.getRect(
+      find.ancestor(of: label, matching: find.byType(Card)),
+    );
+    expect(tab.width, lessThanOrEqualTo(PopupMenu.labelMaxWidth + 32));
+    final strip = tester.getRect(
+      find.descendant(
+        of: find.byType(GroupTabs),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(tab.center.dx, closeTo(strip.center.dx, 1));
+  });
+
+  testWidgets('a long group name ends where its row in the more menu ends', (
+    tester,
+  ) async {
+    const long =
+        'A group whose name runs on and on past the width of any tab, '
+        'a menu row or the strip itself';
+    globalContainer
+        .read(_tabStateProvider.notifier)
+        .set(
+          _tabState([
+            for (var i = 0; i < 12; i++) _group(i == 3 ? long : 'Group $i'),
+          ], current: 'Group 0'),
+        );
+    await pumpTabView(tester);
+    await tester.pump();
+    final tabLabel = tester.getSize(
+      find.descendant(
+        of: find.byType(GroupTabs),
+        matching: find.text(long, findRichText: true),
+      ),
+    );
+
+    await tester.tap(find.byGlyph(AppGlyphs.chevronDown));
+    await tester.pumpAndSettle();
+
+    final menuLabel = tester.getSize(
+      find.descendant(
+        of: find.byType(PopupMenu),
+        matching: find.text(long, findRichText: true),
+      ),
+    );
+    expect(tabLabel.width, PopupMenu.labelMaxWidth);
+    expect(menuLabel.width, PopupMenu.labelMaxWidth);
   });
 
   testWidgets('builds only the tabs in view and opens on a far current one', (
@@ -350,7 +636,7 @@ void main() {
       find
           .descendant(
             of: find.byType(GroupTabs),
-            matching: find.byType(CommonCard),
+            matching: find.byType(Card),
             skipOffstage: false,
           )
           .evaluate()
@@ -410,10 +696,10 @@ void main() {
 }
 
 Finder tabOf(String name) =>
-    find.ancestor(of: find.text(name), matching: find.byType(CommonCard));
+    find.ancestor(of: find.text(name), matching: find.byType(Card));
 
 bool isTabSelected(WidgetTester tester, String name) =>
-    tester.widget<CommonCard>(tabOf(name)).isSelected;
+    tester.widget<Card>(tabOf(name)).isSelected;
 
 ProxiesTabState _tabState(List<Group> groups, {String current = 'B'}) {
   return ProxiesTabState(

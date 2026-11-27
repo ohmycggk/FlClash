@@ -48,6 +48,11 @@ void main() {
     test('a link whose scheme mihomo converts', () {
       expect('vmess://eyJhZGQiOiIxLjIuMy40In0='.isShareLink, isTrue);
       expect('Hy2://pass@example.com:443#HK'.isShareLink, isTrue);
+      expect(
+        'nowhere://0123456789abcdef0123456789abcdef@example.com:443?net=udp&grade=core#HK'
+            .isShareLink,
+        isTrue,
+      );
     });
 
     test('a subscription url', () {

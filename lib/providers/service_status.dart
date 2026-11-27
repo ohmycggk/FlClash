@@ -1,3 +1,4 @@
+import 'package:fl_clash/common/mixin.dart';
 import 'package:fl_clash/common/service_probe.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,9 @@ class ServiceStatus extends _$ServiceStatus
     with RoutedProbe<ServiceTarget, ServiceCheck> {
   @override
   RoutedProbeState<ServiceTarget, ServiceCheck> build() => buildProbe();
+
+  @override
+  bool get recheckFailures => true;
 
   @override
   bool isFailure(ServiceCheck value) =>
@@ -37,11 +41,21 @@ class ServiceStatus extends _$ServiceStatus
         target: ProbeAnswer(
           value: check,
           coreEpoch: check.coreEpoch,
-          picksVersion: check.picksVersion,
-          chains: check.chains,
+          routeVersion: check.routeVersion,
+          hits: check.hits,
+          timedOut: check.status == ServiceProbeStatus.timeout,
         ),
     };
   }
+}
+
+/// How many of [enabledServiceTargets] the dashboard card has room for, which
+/// its sheet marks as shown there.
+@Riverpod(keepAlive: true)
+class ShownServiceCount extends _$ShownServiceCount
+    with AutoDisposeNotifierMixin {
+  @override
+  int build() => 2;
 }
 
 @riverpod

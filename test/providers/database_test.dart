@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:drift/native.dart';
 // `Profiles`, `Scripts` and `ProxyGroups` name both a drift table and a
 // notifier, so the schema side is imported behind a prefix.
+import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/database/database.dart' as db;
 import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/database.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
@@ -32,7 +32,7 @@ void main() {
     order: order,
   );
 
-  setUpAll(() => AppLocalizations.load(const Locale('en')));
+  setUpAll(() => loadAppLocalizations(const Locale('en')));
 
   setUp(() async {
     testDatabase = db.Database(NativeDatabase.memory());
@@ -168,6 +168,31 @@ void main() {
       expect(scoped.read(profilesProvider).map((item) => item.id), [1, 2]);
     });
 
+    test('a new profile sorts last before and after its write lands', () async {
+      notifier.put(profile(1, label: 'First'));
+      await pumpEventQueue();
+
+      notifier.put(profile(2, label: 'Second'));
+      expect(read().map((item) => item.id), [1, 2]);
+
+      await pumpEventQueue();
+      expect(read().map((item) => item.id), [1, 2]);
+    });
+
+    test('a new profile takes its place in the query order at once', () async {
+      notifier.put(profile(3, label: 'Third'));
+      await pumpEventQueue();
+      notifier.reorder(read());
+      await pumpEventQueue();
+
+      notifier.put(profile(2, label: 'Second'));
+      notifier.put(profile(1, label: 'First'));
+      expect(read().map((item) => item.id), [3, 1, 2]);
+
+      await pumpEventQueue();
+      expect(read().map((item) => item.id), [3, 1, 2]);
+    });
+
     test('put falls back to the id when the profile has no label', () async {
       // Profile.normal() leaves the label empty when the download exposed no
       // filename, and optimizeLabel is the only thing that names it.
@@ -280,7 +305,7 @@ void main() {
       final failure = captureWriteFailure(
         () => notifier.put(profile(2, label: 'Lost')),
       );
-      expect(read().map((item) => item.id), [2, 1], reason: 'optimistic');
+      expect(read().map((item) => item.id), [1, 2], reason: 'optimistic');
 
       await failure;
       expect(read().map((item) => item.id), [1], reason: 'rolled back');
@@ -347,6 +372,30 @@ void main() {
         expect(read().single.label, 'Before', reason: 'rolled back');
       },
     );
+
+    test('updateWhere changes every match in one state change', () async {
+      notifier
+        ..put(profile(1, label: 'One', order: 0))
+        ..put(profile(2, label: 'Two', order: 1))
+        ..put(profile(3, label: 'Three', order: 2));
+      await pumpEventQueue();
+      final states = <List<Profile>>[];
+      final subscription = container.listen(
+        profilesProvider,
+        (_, next) => states.add(next),
+      );
+      addTearDown(subscription.close);
+
+      notifier.updateWhere(
+        (item) => item.id != 2,
+        (item) => item.copyWith(label: '${item.label}!'),
+      );
+      expect(states, hasLength(1));
+      await pumpEventQueue();
+
+      final rows = await testDatabase.profilesDao.query().get();
+      expect(rows.map((item) => item.label), ['One!', 'Two', 'Three!']);
+    });
 
     test('reorder only writes the rows whose order actually changed', () async {
       notifier

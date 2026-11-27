@@ -8,10 +8,12 @@ import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
+import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/route_state.dart';
 import 'package:fl_clash/providers/state.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:prism_ui/banner.dart';
 
 class CoreManager extends ConsumerStatefulWidget {
   final Widget child;
@@ -56,6 +58,29 @@ class _CoreContainerState extends ConsumerState<CoreManager>
             .applyProfileDebounce(silence: true);
       }
     });
+    ref.listenManual(globalRulesProvider, (prev, next) {
+      if (prev?.value != null && next.hasValue) {
+        ref.read(setupActionProvider.notifier).applyIfGlobalRulesUsed();
+      }
+    });
+    ref.listenManual(
+      patchClashConfigProvider.select((state) => state.mitm.enable),
+      (prev, next) {
+        if (prev == false && next) {
+          unawaited(ref.read(mitmModulesActionProvider.notifier).autoUpdate());
+        }
+      },
+    );
+    ref.listenManual(mitmModulesProvider, (prev, next) {
+      if (rsFeature &&
+          prev?.value != null &&
+          next.hasValue &&
+          ref.read(patchClashConfigProvider).mitm.enable) {
+        ref
+            .read(setupActionProvider.notifier)
+            .applyProfileDebounce(silence: true);
+      }
+    });
     ref.listenManual(appSettingProvider.select((state) => state.openLogs), (
       prev,
       next,
@@ -68,6 +93,9 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     ref.listenManual(coreStatusProvider, (prev, next) {
       if (next == CoreStatus.connected && prev != CoreStatus.connected) {
         _syncLogStream();
+      }
+      if (prev == CoreStatus.connected && next != CoreStatus.connected) {
+        ref.read(requestsProvider.notifier).closeAll();
       }
     }, fireImmediately: true);
   }
@@ -105,7 +133,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     if (log.logLevel == LogLevel.error) {
       throttler.call(
         FunctionTag.coreErrorNotifier,
-        () => dialogs.showNotifier(log.payload, level: MessageLevel.error),
+        () => dialogs.showBanner(log.payload, level: BannerLevel.error),
         duration: const Duration(seconds: 3),
         fire: true,
       );
@@ -117,9 +145,9 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   void onDialerLoop(String proxyName) {
     throttler.call(
       FunctionTag.dialerLoopNotifier,
-      () => dialogs.showNotifier(
+      () => dialogs.showBanner(
         currentAppLocalizations.dialerProxyLoopStopped(proxyName),
-        level: MessageLevel.error,
+        level: BannerLevel.error,
       ),
       duration: const Duration(seconds: 3),
       fire: true,
@@ -138,6 +166,12 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   void onRequestTraffic(Map<String, RequestTraffic> traffic) {
     ref.read(requestsProvider.notifier).updateTraffic(traffic);
     super.onRequestTraffic(traffic);
+  }
+
+  @override
+  void onRequestsClosed(Set<String> ids) {
+    ref.read(requestsProvider.notifier).close(ids);
+    super.onRequestsClosed(ids);
   }
 
   @override
@@ -169,8 +203,10 @@ class _CoreContainerState extends ConsumerState<CoreManager>
       return;
     }
     ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+    ref.read(coreStopReasonProvider.notifier).value = message;
+    ref.read(setupActionProvider.notifier).onCoreLost();
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      context.showNotifier(message, level: MessageLevel.error);
+      dialogs.showBanner(message, level: BannerLevel.error);
     }
     super.onCrash(message);
   }
